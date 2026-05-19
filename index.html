@@ -760,6 +760,9 @@ function buildPanel(d,idx,today,m) {
   const queueList = queue.length
     ? queue.map(i=>`• ${i.key} — ${i.fields.summary} [${i.fields.priority?.name||''}]`).join('\n')
     : 'No cases currently in QA stage.';
+
+  // Pushed to Customer list
+  const pushedList = pushed.length
     ? pushed.map(i=>`• ${i.key} — ${i.fields.summary}`).join('\n')
     : 'No cases pushed to customer today.';
 

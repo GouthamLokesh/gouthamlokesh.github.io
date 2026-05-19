@@ -705,20 +705,18 @@ async function fetchAll() {
 
 // ── Team Overview ──────────────────────────────────────────────────
 function renderTeamOverview() {
-  const allPushed=Object.values(teamData).flatMap(d=>d.pushed);
-  const allReopen=Object.values(teamData).flatMap(d=>d.reopened);
-  const allQueue =Object.values(teamData).flatMap(d=>d.queue);
-  const allAging =Object.values(teamData).flatMap(d=>d.aging);
-  const allOverdue=Object.values(teamData).flatMap(d=>d.overdue);
-  const teamRate = allPushed.length>0?Math.round((allReopen.length/allPushed.length)*100):0;
+  const allPushed  = Object.values(teamData).flatMap(d=>d.pushed);
+  const allReopen  = Object.values(teamData).flatMap(d=>d.reopened);
+  const allQueue   = Object.values(teamData).flatMap(d=>d.queue);
+  const allAging   = Object.values(teamData).flatMap(d=>d.aging);
+  const allOverdue = Object.values(teamData).flatMap(d=>d.overdue);
 
   document.getElementById('team-stats').innerHTML=`
-    <div class="stat"><div class="stat-num c-green">${allPushed.length}</div><div class="stat-lbl">Pushed Today</div></div>
-    <div class="stat"><div class="stat-num c-orange">${allReopen.length}</div><div class="stat-lbl">Reopened</div></div>
+    <div class="stat"><div class="stat-num c-green">${allPushed.length}</div><div class="stat-lbl">Pushed to Customer</div></div>
+    <div class="stat"><div class="stat-num c-orange">${allReopen.length}</div><div class="stat-lbl">Sent Back to Dev</div></div>
     <div class="stat"><div class="stat-num c-blue">${allQueue.length}</div><div class="stat-lbl">In QA Queue</div></div>
     <div class="stat"><div class="stat-num c-red">${allAging.length}</div><div class="stat-lbl">Aging (${agingDays}d+)</div></div>
     <div class="stat"><div class="stat-num c-red">${allOverdue.length}</div><div class="stat-lbl">Overdue</div></div>
-    <div class="stat"><div class="stat-num" style="color:${teamRate>30?'var(--danger)':teamRate>10?'var(--warning)':'var(--success)'}">${teamRate}%</div><div class="stat-lbl">Reopen Rate</div></div>
     <div class="stat"><div class="stat-num c-teal">${teamMembers.length}</div><div class="stat-lbl">Members</div></div>`;
   document.getElementById('team-overview').classList.remove('section-hidden');
 }
@@ -755,13 +753,41 @@ function renderTabs(date) {
 
 function buildPanel(d,idx,today,m) {
   if(!d) return `<div class="empty-state">No data fetched for this member.</div>`;
-  const {pushed,reopened,queue,aging,overdue,priorities,reopenRate}=d;
+  const {pushed,reopened,queue,aging,overdue,priorities}=d;
   const mid=`m${idx}`;
   const color=avatarColor(m.displayName);
 
-  const pushedList=pushed.length?pushed.map(i=>`• ${i.key} — ${i.fields.summary}`).join('\n'):'No cases pushed to customer today.';
-  const reopenList=reopened.length?reopened.map(i=>`• ${i.key} — ${i.fields.summary}`).join('\n'):'No cases reopened today.';
-  const keyUpdates=`QA Daily Update — ${today}\nMember: ${m.displayName} (${m.name})\n\nPushed to customer: ${pushed.length}\nReopened: ${reopened.length}\nCurrently in QA queue: ${queue.length}\nReopen rate: ${reopenRate}%`;
+  // QA Queue list
+  const queueList = queue.length
+    ? queue.map(i=>`• ${i.key} — ${i.fields.summary} [${i.fields.priority?.name||''}]`).join('\n')
+    : 'No cases currently in QA stage.';
+    ? pushed.map(i=>`• ${i.key} — ${i.fields.summary}`).join('\n')
+    : 'No cases pushed to customer today.';
+
+  // Sent Back to Dev list
+  const sentBackList = reopened.length
+    ? reopened.map(i=>`• ${i.key} — ${i.fields.summary}`).join('\n')
+    : 'No cases sent back to dev today.';
+
+  // Key updates includes all three counts + full case lists
+  const pushedLines  = pushed.length  ? pushed.map(i=>`   • ${i.key} — ${i.fields.summary}`).join('\n')  : '   None';
+  const sentBackLines= reopened.length? reopened.map(i=>`   • ${i.key} — ${i.fields.summary}`).join('\n'): '   None';
+  const queueLines   = queue.length   ? queue.map(i=>`   • ${i.key} — ${i.fields.summary} [${i.fields.priority?.name||'—'}]`).join('\n'): '   None';
+
+  const keyUpdates = `QA Daily Update — ${today}
+Member: ${m.displayName} (${m.name})
+
+✅ Pushed to Customer (${pushed.length}):
+${pushedLines}
+
+🔄 Sent Back to Dev (${reopened.length}):
+${sentBackLines}
+
+📋 Currently in QA Stage (${queue.length}):
+${queueLines}
+
+⏰ Aging Cases (${agingDays}d+): ${aging.length}${aging.length?'\n'+aging.map(i=>`   • ${i.key} — ${i.fields.summary}`).join('\n'):''}
+🔴 Overdue Cases: ${overdue.length}${overdue.length?'\n'+overdue.map(i=>`   • ${i.key} — ${i.fields.summary}`).join('\n'):''}`.trim();
 
   const pushedRows=pushed.map(i=>`<tr>
     <td><span class="tkey">${i.key}</span></td>
@@ -770,7 +796,7 @@ function buildPanel(d,idx,today,m) {
     <td>${i.fields.priority?.name?`<span class="spill ${getPriorityClass(i.fields.priority.name)}">${i.fields.priority.name}</span>`:''}</td>
   </tr>`).join('');
 
-  const reopenRows=reopened.map(i=>`<tr>
+  const sentBackRows=reopened.map(i=>`<tr>
     <td><span class="tkey">${i.key}</span></td>
     <td style="max-width:240px;font-size:11px">${i.fields.summary||''}</td>
     <td><span class="spill ${spillClass(i.fields.status?.name)}">${i.fields.status?.name||''}</span></td>
@@ -788,7 +814,7 @@ function buildPanel(d,idx,today,m) {
       <td style="color:var(--muted);font-size:10px">${i.fields.duedate||'—'}</td>
     </tr>`;}).join('');
 
-  const agingAlert = aging.length ? `<div class="alert alert-warning">⏰ <strong>${aging.length} aging case${aging.length>1?'s':''}</strong> — not updated in ${agingDays}+ days: ${aging.map(i=>i.key).join(', ')}</div>` : '';
+  const agingAlert   = aging.length   ? `<div class="alert alert-warning">⏰ <strong>${aging.length} aging case${aging.length>1?'s':''}</strong> — not updated in ${agingDays}+ days: ${aging.map(i=>i.key).join(', ')}</div>` : '';
   const overdueAlert = overdue.length ? `<div class="alert alert-danger">🔴 <strong>${overdue.length} overdue case${overdue.length>1?'s':''}</strong> — past due date: ${overdue.map(i=>i.key).join(', ')}</div>` : '';
 
   return `
@@ -796,16 +822,20 @@ function buildPanel(d,idx,today,m) {
     <div class="avatar" style="background:${color};width:38px;height:38px;font-size:14px">${initials(m.displayName)}</div>
     <div><div class="member-name">${m.displayName}</div><div class="member-sub">${m.email||m.name}</div></div>
     <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">
-      <span style="background:rgba(62,207,142,0.1);color:var(--success);border-radius:4px;padding:2px 8px;font-size:10px;font-family:var(--mono)">${pushed.length} pushed</span>
-      <span style="background:rgba(245,166,35,0.1);color:var(--warning);border-radius:4px;padding:2px 8px;font-size:10px;font-family:var(--mono)">${reopened.length} reopened</span>
-      <span style="background:rgba(79,142,247,0.1);color:var(--accent);border-radius:4px;padding:2px 8px;font-size:10px;font-family:var(--mono)">${queue.length} in queue</span>
-      <span style="background:rgba(240,82,82,0.1);color:var(--danger);border-radius:4px;padding:2px 8px;font-size:10px;font-family:var(--mono)">${reopenRate}% reopen rate</span>
+      <span style="background:rgba(62,207,142,0.1);color:var(--success);border-radius:4px;padding:2px 8px;font-size:10px;font-family:var(--mono)">✅ ${pushed.length} pushed to customer</span>
+      <span style="background:rgba(245,166,35,0.1);color:var(--warning);border-radius:4px;padding:2px 8px;font-size:10px;font-family:var(--mono)">🔄 ${reopened.length} sent back to dev</span>
+      <span style="background:rgba(79,142,247,0.1);color:var(--accent);border-radius:4px;padding:2px 8px;font-size:10px;font-family:var(--mono)">📋 ${queue.length} in queue</span>
+      ${aging.length?`<span style="background:rgba(240,82,82,0.1);color:var(--danger);border-radius:4px;padding:2px 8px;font-size:10px;font-family:var(--mono)">⏰ ${aging.length} aging</span>`:''}
+      ${overdue.length?`<span style="background:rgba(240,82,82,0.1);color:var(--danger);border-radius:4px;padding:2px 8px;font-size:10px;font-family:var(--mono)">🔴 ${overdue.length} overdue</span>`:''}
     </div>
   </div>
 
   ${agingAlert}${overdueAlert}
 
   <div class="mini-stats">
+    <div class="mini-stat"><div class="mini-num c-green">${pushed.length}</div><div class="mini-lbl">Pushed to Customer</div></div>
+    <div class="mini-stat"><div class="mini-num c-orange">${reopened.length}</div><div class="mini-lbl">Sent Back to Dev</div></div>
+    <div class="mini-stat"><div class="mini-num c-blue">${queue.length}</div><div class="mini-lbl">In QA Queue</div></div>
     <div class="mini-stat"><div class="mini-num c-red">${priorities.critical}</div><div class="mini-lbl">Critical</div></div>
     <div class="mini-stat"><div class="mini-num c-orange">${priorities.high}</div><div class="mini-lbl">High</div></div>
     <div class="mini-stat"><div class="mini-num c-blue">${priorities.medium}</div><div class="mini-lbl">Medium</div></div>
@@ -814,18 +844,21 @@ function buildPanel(d,idx,today,m) {
     <div class="mini-stat"><div class="mini-num c-red">${overdue.length}</div><div class="mini-lbl">Overdue</div></div>
   </div>
 
-  ${pushed.length?`<div style="font-family:var(--mono);font-size:10px;color:var(--success);margin:12px 0 6px;letter-spacing:0.5px">✅ PUSHED TO CUSTOMER (${pushed.length})</div>
+  ${pushed.length?`
+  <div style="font-family:var(--mono);font-size:10px;color:var(--success);margin:12px 0 6px;letter-spacing:0.5px">✅ PUSHED TO CUSTOMER (${pushed.length})</div>
   <div class="tbl-wrap"><table><thead><tr><th>Key</th><th>Summary</th><th>Status</th><th>Priority</th></tr></thead><tbody>${pushedRows}</tbody></table></div>`
-  :'<div style="color:var(--muted);font-size:12px;margin:8px 0">No cases pushed to customer today.</div>'}
+  :'<div style="color:var(--muted);font-size:12px;margin:8px 0 4px">No cases pushed to customer today.</div>'}
 
-  ${reopened.length?`<div style="font-family:var(--mono);font-size:10px;color:var(--warning);margin:12px 0 6px;letter-spacing:0.5px">🔄 REOPENED (${reopened.length})</div>
-  <div class="tbl-wrap"><table><thead><tr><th>Key</th><th>Summary</th><th>Status</th><th>Priority</th></tr></thead><tbody>${reopenRows}</tbody></table></div>`
-  :'<div style="color:var(--muted);font-size:12px;margin:8px 0">No cases reopened today.</div>'}
+  ${reopened.length?`
+  <div style="font-family:var(--mono);font-size:10px;color:var(--warning);margin:12px 0 6px;letter-spacing:0.5px">🔄 SENT BACK TO DEV (${reopened.length})</div>
+  <div class="tbl-wrap"><table><thead><tr><th>Key</th><th>Summary</th><th>Status</th><th>Priority</th></tr></thead><tbody>${sentBackRows}</tbody></table></div>`
+  :'<div style="color:var(--muted);font-size:12px;margin:8px 0 4px">No cases sent back to dev today.</div>'}
 
-  ${queue.length?`<div style="font-family:var(--mono);font-size:10px;color:var(--accent);margin:12px 0 6px;letter-spacing:0.5px">📋 QA QUEUE (${queue.length})</div>
+  ${queue.length?`
+  <div style="font-family:var(--mono);font-size:10px;color:var(--accent);margin:12px 0 6px;letter-spacing:0.5px">📋 QA QUEUE (${queue.length})</div>
   <div class="tbl-wrap"><table><thead><tr><th>Key</th><th>Summary</th><th>Priority</th><th>Flags</th><th>Due</th></tr></thead><tbody>${queueRows}</tbody></table></div>`:''}
 
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;margin-bottom:10px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-top:18px;margin-bottom:10px">
     <div style="font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:1px">📋 TEAMS FORM — ${m.displayName.split(' ')[0].toUpperCase()}</div>
     <button class="btn btn-success btn-sm" onclick="copyAll('${mid}','${m.displayName.replace(/'/g,"\\'")}')">Copy All Fields</button>
   </div>
@@ -833,33 +866,47 @@ function buildPanel(d,idx,today,m) {
   <div class="form-body">
     <div class="fld">
       <div class="fld-label">Key Updates <button class="copy-btn" onclick="cpTA('${mid}-ku',this)">Copy</button></div>
-      <textarea class="fld-ta" id="${mid}-ku" rows="5">${keyUpdates}</textarea>
+      <textarea class="fld-ta" id="${mid}-ku" rows="6">${keyUpdates}</textarea>
     </div>
+
     <div class="fld">
       <div class="fld-label">Cases Pushed to Customer or Closed <button class="copy-btn" onclick="cpRO('${mid}-cc',this)">Copy</button></div>
       <div class="fld-ro" id="${mid}-cc">${pushedList}</div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      <div class="fld">
-        <div class="fld-label">Count — Pushed <button class="copy-btn" onclick="cpRO('${mid}-nc',this)">Copy</button></div>
-        <div class="fld-num c-green" id="${mid}-nc">${pushed.length}</div>
-      </div>
-      <div class="fld">
-        <div class="fld-label">Count — Reopened <button class="copy-btn" onclick="cpRO('${mid}-nr',this)">Copy</button></div>
-        <div class="fld-num c-orange" id="${mid}-nr">${reopened.length}</div>
-      </div>
-    </div>
+
     <div class="fld">
-      <div class="fld-label">Cases Reopened <button class="copy-btn" onclick="cpRO('${mid}-cr',this)">Copy</button></div>
-      <div class="fld-ro" id="${mid}-cr">${reopenList}</div>
+      <div class="fld-label">Count — Cases Pushed to Customer or Closed <button class="copy-btn" onclick="cpRO('${mid}-nc',this)">Copy</button></div>
+      <div class="fld-num c-green" id="${mid}-nc" style="max-width:120px">${pushed.length}</div>
     </div>
+
+    <div class="fld">
+      <div class="fld-label">Cases Sent Back to Dev (Reopened) <button class="copy-btn" onclick="cpRO('${mid}-cr',this)">Copy</button></div>
+      <div class="fld-ro" id="${mid}-cr">${sentBackList}</div>
+    </div>
+
+    <div class="fld">
+      <div class="fld-label">Count — Cases Sent Back to Dev <button class="copy-btn" onclick="cpRO('${mid}-nr',this)">Copy</button></div>
+      <div class="fld-num c-orange" id="${mid}-nr" style="max-width:120px">${reopened.length}</div>
+    </div>
+
+    <div class="fld">
+      <div class="fld-label">Cases Currently in QA Stage <button class="copy-btn" onclick="cpRO('${mid}-cq',this)">Copy</button></div>
+      <div class="fld-ro" id="${mid}-cq">${queueList}</div>
+    </div>
+
+    <div class="fld">
+      <div class="fld-label">Count — Cases in QA Stage <button class="copy-btn" onclick="cpRO('${mid}-nq',this)">Copy</button></div>
+      <div class="fld-num c-blue" id="${mid}-nq" style="max-width:120px">${queue.length}</div>
+    </div>
+
     <div class="fld">
       <div class="fld-label">Plans for Tomorrow <button class="copy-btn" onclick="cpTA('${mid}-pl',this)">Copy</button></div>
       <textarea class="fld-ta" id="${mid}-pl" rows="4" placeholder="What is ${m.displayName.split(' ')[0]} planning to work on tomorrow?"></textarea>
     </div>
+
     <div class="fld">
       <div class="fld-label">Additional Comments <button class="copy-btn" onclick="cpTA('${mid}-cm',this)">Copy</button></div>
-      <textarea class="fld-ta" id="${mid}-cm" rows="4">${queue.length} cases currently in QA queue. ${aging.length>0?`${aging.length} aging case(s): ${aging.map(i=>i.key).join(', ')}.`:''} ${overdue.length>0?`${overdue.length} overdue case(s): ${overdue.map(i=>i.key).join(', ')}.`:''} Reopen rate: ${reopenRate}%.</textarea>
+      <textarea class="fld-ta" id="${mid}-cm" rows="4">${queue.length} case${queue.length!==1?'s':''} currently in QA stage.${aging.length>0?' Aging case(s): '+aging.map(i=>i.key).join(', ')+'.':''}${overdue.length>0?' Overdue case(s): '+overdue.map(i=>i.key).join(', ')+'.':''}</textarea>
     </div>
   </div>`;
 }
@@ -874,9 +921,11 @@ function copyAll(mid,name){
   const nc=document.getElementById(`${mid}-nc`)?.innerText||'';
   const cr=document.getElementById(`${mid}-cr`)?.innerText||'';
   const nr=document.getElementById(`${mid}-nr`)?.innerText||'';
+  const cq=document.getElementById(`${mid}-cq`)?.innerText||'';
+  const nq=document.getElementById(`${mid}-nq`)?.innerText||'';
   const pl=document.getElementById(`${mid}-pl`)?.value||'';
   const cm=document.getElementById(`${mid}-cm`)?.value||'';
-  const txt=`=== ${name} ===\n\n--- KEY UPDATES ---\n${ku}\n\n--- CASES PUSHED/CLOSED ---\n${cc}\n\n--- COUNT PUSHED: ${nc} ---\n\n--- CASES REOPENED ---\n${cr}\n\n--- COUNT REOPENED: ${nr} ---\n\n--- PLANS FOR TOMORROW ---\n${pl}\n\n--- ADDITIONAL COMMENTS ---\n${cm}`;
+  const txt=`=== ${name} ===\n\n--- KEY UPDATES ---\n${ku}\n\n--- CASES PUSHED TO CUSTOMER ---\n${cc}\n\n--- COUNT PUSHED: ${nc} ---\n\n--- CASES SENT BACK TO DEV ---\n${cr}\n\n--- COUNT SENT BACK: ${nr} ---\n\n--- CASES CURRENTLY IN QA STAGE ---\n${cq}\n\n--- COUNT IN QA STAGE: ${nq} ---\n\n--- PLANS FOR TOMORROW ---\n${pl}\n\n--- ADDITIONAL COMMENTS ---\n${cm}`;
   navigator.clipboard.writeText(txt).then(()=>showToast(`✅ ${name}'s fields copied!`));
 }
 
@@ -902,8 +951,7 @@ function renderLeaderboard() {
       </div>
       <div class="lb-nums">
         <div style="color:var(--success)">${d.pushed.length} pushed</div>
-        <div style="color:var(--warning);font-size:10px">${d.reopened.length} reopened</div>
-        <div style="color:var(--danger);font-size:10px">${d.reopenRate}% rate</div>
+        <div style="color:var(--warning);font-size:10px">${d.reopened.length} sent back</div>
       </div>
     </div>`;}).join('');
 }

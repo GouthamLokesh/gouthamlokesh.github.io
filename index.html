@@ -1,741 +1,1066 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>QA Team Daily Update</title>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>QA Team Daily Update</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0e0f14;--surface:#16181f;--surface2:#1e2029;--border:#2a2d3a;
+  --accent:#4f8ef7;--accent2:#7c5cbf;--success:#3ecf8e;--warning:#f5a623;--danger:#f05252;--info:#06b6d4;
+  --text:#e8eaf0;--muted:#6b7080;--mono:'DM Mono',monospace;--sans:'DM Sans',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;display:flex;font-size:14px}
 
-  :root {
-    --bg: #0e0f14;
-    --surface: #16181f;
-    --surface2: #1e2029;
-    --border: #2a2d3a;
-    --accent: #4f8ef7;
-    --accent2: #7c5cbf;
-    --success: #3ecf8e;
-    --warning: #f5a623;
-    --danger: #f05252;
-    --text: #e8eaf0;
-    --muted: #6b7080;
-    --mono: 'JetBrains Mono', monospace;
-    --sans: 'DM Sans', sans-serif;
-  }
+/* Sidebar */
+.sidebar{width:220px;min-height:100vh;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;position:sticky;top:0;height:100vh}
+.sidebar-logo{display:flex;align-items:center;gap:10px;padding:18px 16px;border-bottom:1px solid var(--border)}
+.logo-icon{width:34px;height:34px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.logo-title{font-size:13px;font-weight:600;font-family:var(--mono)}
+.logo-sub{font-size:10px;color:var(--muted)}
+.sidebar-nav{padding:10px 8px;flex:1;overflow-y:auto}
+.nav-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px;font-size:13px;font-weight:500;color:var(--muted);text-decoration:none;cursor:pointer;transition:all 0.15s;margin-bottom:1px;border:none;background:none;width:100%;text-align:left}
+.nav-item:hover{color:var(--text);background:var(--surface2)}
+.nav-item.active{color:var(--accent);background:rgba(79,142,247,0.1)}
+.nav-section{font-size:9px;font-weight:600;color:var(--muted);letter-spacing:1px;text-transform:uppercase;padding:12px 10px 4px}
+.sidebar-footer{padding:12px 16px;border-top:1px solid var(--border)}
+.conn-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;flex-shrink:0}
+.conn-dot.on{background:var(--success)}.conn-dot.off{background:var(--danger)}
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+/* Main */
+.main{flex:1;overflow-y:auto;padding:24px 28px;max-width:calc(100vw - 220px)}
+.section{display:none}.section.active{display:block}
+.page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px}
+.page-title{font-size:20px;font-weight:600;font-family:var(--mono);letter-spacing:-0.5px}
+.page-sub{font-size:12px;color:var(--muted);margin-top:3px}
+.header-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--sans);
-    min-height: 100vh;
-    padding: 24px;
-  }
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-family:var(--sans);font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all 0.2s;white-space:nowrap}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:#3a7de8}.btn-primary:disabled{opacity:0.4;cursor:not-allowed}
+.btn-outline{background:none;border:1px solid var(--border);color:var(--text)}.btn-outline:hover{border-color:var(--accent);color:var(--accent)}
+.btn-success{background:var(--success);color:#0e1a12}.btn-success:hover{background:#35b87c}
+.btn-danger{background:none;border:1px solid rgba(240,82,82,0.4);color:var(--danger);font-size:12px;padding:6px 12px}
+.btn-ghost{background:none;border:none;color:var(--muted);font-size:12px;padding:5px 8px}.btn-ghost:hover{color:var(--text)}
+.btn-sm{padding:5px 12px;font-size:12px}
+.btn-csv{background:rgba(62,207,142,0.1);border:1px solid rgba(62,207,142,0.3);color:var(--success)}
+.btn-csv:hover{background:rgba(62,207,142,0.2)}
 
-  .app { max-width: 980px; margin: 0 auto; }
+/* Cards */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:14px}
+.card-title{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--accent);letter-spacing:1px;text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between}
 
-  header {
-    display: flex; align-items: center; gap: 14px;
-    margin-bottom: 28px; padding-bottom: 18px; border-bottom: 1px solid var(--border);
-  }
-  .logo {
-    width: 42px; height: 42px;
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    border-radius: 10px; display: flex; align-items: center; justify-content: center;
-    font-size: 20px; flex-shrink: 0;
-  }
-  header h1 { font-family: var(--mono); font-size: 17px; font-weight: 700; }
-  header p { font-size: 12px; color: var(--muted); margin-top: 2px; }
-  .badge {
-    margin-left: auto; background: rgba(79,142,247,0.12); color: var(--accent);
-    font-family: var(--mono); font-size: 10px; padding: 4px 10px;
-    border-radius: 20px; border: 1px solid rgba(79,142,247,0.3);
-  }
+/* Conn bar */
+.conn-bar{margin-bottom:16px}
+.conn-bar-inner{display:flex;align-items:center;gap:10px;padding:9px 14px;border-radius:9px;font-size:12px;flex-wrap:wrap}
+.cbi-off{background:rgba(240,82,82,0.08);border:1px solid rgba(240,82,82,0.25);color:#f87171}
+.cbi-on{background:rgba(62,207,142,0.08);border:1px solid rgba(62,207,142,0.25);color:var(--success)}
 
-  /* Steps */
-  .steps { display: flex; margin-bottom: 24px; position: relative; }
-  .steps::before {
-    content: ''; position: absolute; top: 16px; left: 16px; right: 16px;
-    height: 1px; background: var(--border); z-index: 0;
-  }
-  .step { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; position: relative; z-index: 1; }
-  .step-dot {
-    width: 32px; height: 32px; border-radius: 50%; background: var(--surface2);
-    border: 1.5px solid var(--border); display: flex; align-items: center; justify-content: center;
-    font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--muted); transition: all 0.3s;
-  }
-  .step.active .step-dot { background: var(--accent); border-color: var(--accent); color: white; box-shadow: 0 0 16px rgba(79,142,247,0.4); }
-  .step.done .step-dot { background: var(--success); border-color: var(--success); color: white; }
-  .step-label { font-size: 10px; color: var(--muted); text-align: center; font-weight: 500; }
-  .step.active .step-label { color: var(--accent); }
-  .step.done .step-label { color: var(--success); }
+/* Stats grid */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px}
+.stat{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;text-align:center}
+.stat-num{font-family:var(--mono);font-size:24px;font-weight:700;line-height:1;margin-bottom:3px}
+.stat-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px}
+.c-blue{color:var(--accent)}.c-green{color:var(--success)}.c-orange{color:var(--warning)}.c-red{color:var(--danger)}.c-teal{color:var(--info)}
 
-  /* Cards */
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 24px; margin-bottom: 16px; }
-  .card-title {
-    font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--accent);
-    letter-spacing: 1px; text-transform: uppercase; margin-bottom: 18px;
-    display: flex; align-items: center; gap: 8px;
-  }
-  .card-title::before { content: ''; display: inline-block; width: 3px; height: 14px; background: var(--accent); border-radius: 2px; }
+/* Member tabs */
+.tab-container{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:14px}
+.tabs-bar{display:flex;overflow-x:auto;border-bottom:1px solid var(--border)}
+.tabs-bar::-webkit-scrollbar{height:3px}
+.tabs-bar::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.tab-btn{padding:10px 16px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;white-space:nowrap;transition:all 0.15s;font-family:var(--sans);display:flex;align-items:center;gap:6px}
+.tab-btn:hover{color:var(--text)}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab-count{background:rgba(79,142,247,0.15);color:var(--accent);font-family:var(--mono);font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px}
+.tab-btn.active .tab-count{background:var(--accent);color:white}
+.tab-panel{display:none;padding:18px}.tab-panel.active{display:block}
 
-  .field-group { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-  .field-group.single { grid-template-columns: 1fr; }
-  .field { display: flex; flex-direction: column; gap: 6px; }
-  label { font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: 0.4px; text-transform: uppercase; }
+/* Member header */
+.member-hdr{display:flex;align-items:center;gap:10px;padding-bottom:14px;border-bottom:1px solid var(--border);margin-bottom:14px}
+.member-name{font-weight:600;font-size:14px}.member-sub{font-size:11px;color:var(--muted)}
+.avatar{border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:600;color:white;flex-shrink:0}
 
-  input, textarea, select {
-    background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
-    color: var(--text); font-family: var(--sans); font-size: 13px; padding: 10px 13px;
-    outline: none; transition: border-color 0.2s, box-shadow 0.2s; width: 100%;
-  }
-  input[type="password"] { font-family: var(--mono); letter-spacing: 2px; }
-  input:focus, textarea:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79,142,247,0.12); }
-  textarea { min-height: 70px; resize: vertical; font-size: 12px; }
-  .hint { font-size: 10px; color: var(--muted); margin-top: 2px; }
+/* Mini stats */
+.mini-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:8px;margin:12px 0}
+.mini-stat{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;text-align:center}
+.mini-num{font-family:var(--mono);font-size:18px;font-weight:700;line-height:1;margin-bottom:2px}
+.mini-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px}
 
-  .btn {
-    display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px;
-    border-radius: 8px; font-family: var(--sans); font-size: 13px; font-weight: 600;
-    cursor: pointer; border: none; transition: all 0.2s;
-  }
-  .btn-primary { background: var(--accent); color: white; }
-  .btn-primary:hover { background: #3a7de8; transform: translateY(-1px); }
-  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
-  .btn-secondary { background: var(--surface2); border: 1px solid var(--border); color: var(--text); }
-  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
-  .btn-success { background: var(--success); color: #0e1a12; }
-  .btn-success:hover { background: #35b87c; }
-  .btn-sm { padding: 6px 14px; font-size: 11px; }
-  .actions { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; align-items: center; }
+/* Priority pills */
+.priority-row{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.pri-pill{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.3px}
+.pri-critical{background:rgba(240,82,82,0.15);color:var(--danger);border:1px solid rgba(240,82,82,0.3)}
+.pri-high{background:rgba(245,166,35,0.15);color:var(--warning);border:1px solid rgba(245,166,35,0.3)}
+.pri-medium{background:rgba(79,142,247,0.15);color:var(--accent);border:1px solid rgba(79,142,247,0.3)}
+.pri-low{background:rgba(107,112,128,0.15);color:var(--muted);border:1px solid rgba(107,112,128,0.3)}
 
-  .status-bar {
-    background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
-    padding: 10px 14px; font-family: var(--mono); font-size: 11px; color: var(--muted);
-    margin-top: 14px; min-height: 38px; display: flex; align-items: center; gap: 8px;
-  }
-  .status-bar.loading { color: var(--accent); }
-  .status-bar.success { color: var(--success); border-color: rgba(62,207,142,0.3); }
-  .status-bar.error { color: var(--danger); border-color: rgba(240,82,82,0.3); }
+/* Alert box */
+.alert{border-radius:8px;padding:10px 14px;font-size:12px;margin:10px 0;display:flex;align-items:flex-start;gap:8px;line-height:1.5}
+.alert-danger{background:rgba(240,82,82,0.08);border:1px solid rgba(240,82,82,0.25);color:#f87171}
+.alert-warning{background:rgba(245,166,35,0.08);border:1px solid rgba(245,166,35,0.25);color:var(--warning)}
+.alert-info{background:rgba(79,142,247,0.08);border:1px solid rgba(79,142,247,0.25);color:#8bb4fa}
 
-  .spinner { width: 12px; height: 12px; border: 2px solid transparent; border-top-color: currentColor; border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0; }
-  @keyframes spin { to { transform: rotate(360deg); } }
+/* Ticket table */
+.tbl-wrap{border:1px solid var(--border);border-radius:8px;overflow:hidden;margin:10px 0}
+.tbl-wrap table{width:100%;border-collapse:collapse;font-size:11px}
+.tbl-wrap th{background:var(--surface2);padding:6px 10px;text-align:left;font-family:var(--mono);font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border)}
+.tbl-wrap td{padding:6px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+.tbl-wrap tr:last-child td{border-bottom:none}
+.tbl-wrap tr:hover td{background:rgba(79,142,247,0.04)}
+.tkey{font-family:var(--mono);font-size:10px;color:var(--accent);font-weight:700;white-space:nowrap}
+.spill{display:inline-block;padding:2px 7px;border-radius:20px;font-size:9px;font-weight:700;text-transform:uppercase;white-space:nowrap}
+.s-done{background:rgba(62,207,142,0.15);color:var(--success)}
+.s-reopen{background:rgba(245,166,35,0.15);color:var(--warning)}
+.s-progress{background:rgba(79,142,247,0.15);color:var(--accent)}
+.s-todo{background:rgba(107,112,128,0.2);color:var(--muted)}
+.s-overdue{background:rgba(240,82,82,0.15);color:var(--danger)}
 
-  .info-box { background: rgba(79,142,247,0.07); border: 1px solid rgba(79,142,247,0.2); border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #8bb4fa; margin-bottom: 16px; line-height: 1.6; }
+/* Form fields */
+.form-body{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:14px}
+.fld{margin-bottom:12px}
+.fld-label{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:5px;display:flex;align-items:center;justify-content:space-between}
+.fld-row{display:flex;gap:8px;align-items:flex-start}
+.fld-ta{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:var(--sans);font-size:12px;padding:8px 11px;outline:none;resize:vertical;transition:border-color 0.2s}
+.fld-ta:focus{border-color:var(--accent)}
+.fld-ro{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:var(--mono);font-size:11px;padding:8px 11px;min-height:50px;line-height:1.6;white-space:pre-wrap}
+.fld-num{background:var(--bg);border:1px solid var(--border);border-radius:7px;font-family:var(--mono);font-size:18px;font-weight:700;padding:6px 14px;text-align:center}
+.copy-btn{display:flex;align-items:center;gap:5px;background:var(--surface);border:1px solid var(--border);border-radius:7px;color:var(--muted);font-size:11px;font-weight:600;padding:6px 10px;cursor:pointer;white-space:nowrap;transition:all 0.2s;flex-shrink:0;font-family:var(--sans)}
+.copy-btn:hover{border-color:var(--accent);color:var(--accent)}
+.copy-btn.copied{border-color:var(--success);color:var(--success)}
 
-  .group-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-  .group-pill {
-    background: var(--surface2); border: 1px solid var(--border); border-radius: 20px;
-    padding: 6px 16px; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.2s;
-  }
-  .group-pill:hover { border-color: var(--accent); color: var(--accent); }
-  .group-pill.selected { background: rgba(79,142,247,0.15); border-color: var(--accent); color: var(--accent); }
+/* Leaderboard */
+.lb-row{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);transition:background 0.15s}
+.lb-row:last-child{border-bottom:none}
+.lb-row:hover{background:var(--surface2)}
+.lb-rank{font-family:var(--mono);font-size:14px;font-weight:700;width:24px;text-align:center;flex-shrink:0}
+.lb-rank.gold{color:#f5a623}.lb-rank.silver{color:#9ca3af}.lb-rank.bronze{color:#cd7c4a}
+.lb-bar-wrap{flex:1;background:var(--surface2);border-radius:4px;height:6px;overflow:hidden}
+.lb-bar{height:6px;border-radius:4px;background:var(--accent);transition:width 0.5s}
+.lb-nums{font-family:var(--mono);font-size:11px;text-align:right;flex-shrink:0;min-width:80px}
 
-  .avatar {
-    width: 28px; height: 28px; border-radius: 50%;
-    display: inline-flex; align-items: center; justify-content: center;
-    font-size: 10px; font-weight: 700; color: white; flex-shrink: 0;
-  }
+/* History */
+.hist-item{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:border-color 0.15s}
+.hist-item:hover{border-color:var(--accent)}
+.hist-date{font-family:var(--mono);font-size:12px;font-weight:600;margin-bottom:4px}
+.hist-meta{font-size:11px;color:var(--muted)}
 
-  /* Member tabs */
-  .tab-container { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; margin-bottom: 16px; }
-  .member-tabs-bar { display: flex; overflow-x: auto; border-bottom: 1px solid var(--border); }
-  .member-tabs-bar::-webkit-scrollbar { height: 3px; }
-  .member-tabs-bar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-  .member-tab {
-    padding: 11px 18px; font-size: 12px; font-weight: 600; color: var(--muted);
-    cursor: pointer; border: none; background: none; border-bottom: 2px solid transparent;
-    white-space: nowrap; transition: all 0.2s; font-family: var(--sans);
-    display: flex; align-items: center; gap: 7px;
-  }
-  .member-tab:hover { color: var(--text); }
-  .member-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
-  .tab-count {
-    background: rgba(79,142,247,0.15); color: var(--accent); font-family: var(--mono);
-    font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 10px;
-  }
-  .member-tab.active .tab-count { background: var(--accent); color: white; }
-  .member-panel { display: none; padding: 20px; }
-  .member-panel.active { display: block; }
+/* Settings */
+.settings-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:14px}
+.s-title{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px}
+.s-field{margin-bottom:12px}
+.s-label{display:block;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:5px}
+.s-input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--sans);font-size:13px;padding:8px 12px;outline:none;transition:border-color 0.2s}
+.s-input:focus{border-color:var(--accent)}
+.s-jql{font-family:var(--mono);font-size:11px;min-height:70px;resize:vertical}
+.s-hint{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5}
+.s-hint a{color:var(--accent)}
+.pat-row{display:flex;gap:8px}
+.pat-row .s-input{flex:1}
+.conn-result{margin-top:10px;font-size:12px;min-height:18px}
+.conn-result.ok{color:var(--success)}.conn-result.err{color:var(--danger)}
+.user-card{display:flex;align-items:center;gap:12px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-top:10px}
+.user-avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:white}
 
-  /* Stats */
-  .stats-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin: 14px 0; }
-  .stat-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; text-align: center; }
-  .stat-card .num { font-family: var(--mono); font-size: 22px; font-weight: 700; line-height: 1; margin-bottom: 3px; }
-  .stat-card .lbl { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
-  .stat-card.blue .num { color: var(--accent); }
-  .stat-card.green .num { color: var(--success); }
-  .stat-card.orange .num { color: var(--warning); }
-  .stat-card.red .num { color: var(--danger); }
+/* Member list in settings */
+.m-item{display:flex;align-items:center;gap:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:8px}
+.m-name{font-weight:600;font-size:13px}.m-uname{font-size:10px;color:var(--muted);font-family:var(--mono)}
+.rm-btn{background:none;border:1px solid rgba(240,82,82,0.4);color:var(--danger);border-radius:6px;padding:3px 10px;cursor:pointer;font-size:11px;font-family:var(--sans);margin-left:auto}
 
-  /* Ticket table */
-  .ticket-wrap { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin: 12px 0; }
-  .ticket-wrap table { width: 100%; border-collapse: collapse; font-size: 11px; }
-  .ticket-wrap th { background: var(--surface2); padding: 7px 10px; text-align: left; font-family: var(--mono); font-size: 9px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
-  .ticket-wrap td { padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-  .ticket-wrap tr:last-child td { border-bottom: none; }
-  .ticket-wrap tr:hover td { background: rgba(79,142,247,0.04); }
-  .ticket-key { font-family: var(--mono); font-size: 10px; color: var(--accent); font-weight: 700; white-space: nowrap; }
-  .status-pill { display: inline-block; padding: 2px 7px; border-radius: 20px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap; }
-  .pill-done { background: rgba(62,207,142,0.15); color: var(--success); }
-  .pill-progress { background: rgba(79,142,247,0.15); color: var(--accent); }
-  .pill-reopen { background: rgba(245,166,35,0.15); color: var(--warning); }
-  .pill-todo { background: rgba(107,112,128,0.2); color: var(--muted); }
+/* Progress */
+.prog-wrap{margin:12px 0}
+.prog-lbl{font-size:10px;color:var(--muted);margin-bottom:4px;font-family:var(--mono)}
+.prog-bg{background:var(--surface2);border-radius:4px;height:5px;overflow:hidden}
+.prog-fill{height:5px;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:4px;transition:width 0.4s}
 
-  /* Form output */
-  .out-field { margin-bottom: 12px; }
-  .out-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; display: flex; align-items: center; justify-content: space-between; }
-  .copy-btn { background: none; border: 1px solid var(--border); color: var(--muted); font-size: 9px; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-family: var(--mono); transition: all 0.2s; }
-  .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
-  textarea.out { background: var(--bg); border-color: var(--border); font-family: var(--mono); font-size: 11px; color: var(--text); min-height: 60px; }
-  input.out { background: var(--bg); border-color: var(--border); font-family: var(--mono); font-size: 12px; color: var(--success); font-weight: 700; }
+/* Status bar */
+.sbar{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 13px;font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:10px;min-height:34px;display:flex;align-items:center;gap:8px}
+.sbar.ok{color:var(--success);border-color:rgba(62,207,142,0.3)}
+.sbar.err{color:var(--danger);border-color:rgba(240,82,82,0.3)}
+.sbar.loading{color:var(--accent)}
+.spinner{width:11px;height:11px;border:2px solid transparent;border-top-color:currentColor;border-radius:50%;animation:spin 0.7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
 
-  .member-header { display: flex; align-items: center; gap: 10px; padding-bottom: 14px; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
-  .member-name { font-weight: 600; font-size: 14px; }
-  .member-email { font-size: 11px; color: var(--muted); }
+/* Chart canvas */
+.chart-wrap{position:relative;height:200px;margin:12px 0}
 
-  .progress-bar-wrap { margin-top: 12px; }
-  .progress-bar-bg { background: var(--surface2); border-radius: 4px; height: 5px; overflow: hidden; }
-  .progress-bar-fill { height: 5px; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 4px; transition: width 0.4s; }
-  .progress-label { font-size: 10px; color: var(--muted); margin-bottom: 4px; font-family: var(--mono); }
+/* Toast */
+.toast{position:fixed;bottom:20px;right:20px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 16px;font-size:13px;color:var(--text);box-shadow:0 8px 32px rgba(0,0,0,0.4);transform:translateY(16px);opacity:0;transition:all 0.3s;pointer-events:none;z-index:999}
+.toast.show{transform:translateY(0);opacity:1}
 
-  .section-hidden { display: none; }
+.due-badge{background:rgba(245,166,35,0.12);color:var(--warning);border:1px solid rgba(245,166,35,0.3);border-radius:20px;font-size:11px;font-weight:600;padding:4px 12px}
+.section-hidden{display:none!important}
+.info-box{background:rgba(79,142,247,0.07);border:1px solid rgba(79,142,247,0.2);border-radius:8px;padding:9px 13px;font-size:12px;color:#8bb4fa;margin-bottom:14px;line-height:1.6}
+.divider{height:1px;background:var(--border);margin:14px 0}
+input[type="date"]{color-scheme:dark;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:var(--sans);font-size:12px;padding:6px 10px;outline:none}
+input[type="date"]:focus{border-color:var(--accent)}
+.empty-state{text-align:center;padding:40px 20px;color:var(--muted);font-size:13px}
 </style>
 </head>
 <body>
-<div class="app">
 
-  <header>
-    <div class="logo">🧪</div>
-    <div>
-      <h1>QA Team Daily Update</h1>
-      <p>Jira → Per-member form automation</p>
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
     </div>
-    <div class="badge">PAT AUTH</div>
-  </header>
-
-  <div class="steps">
-    <div class="step active" id="s1"><div class="step-dot">1</div><div class="step-label">Connect</div></div>
-    <div class="step" id="s2"><div class="step-dot">2</div><div class="step-label">Add Members</div></div>
-    <div class="step" id="s3"><div class="step-dot">3</div><div class="step-label">Fetch Cases</div></div>
-    <div class="step" id="s4"><div class="step-dot">4</div><div class="step-label">Per-Member Forms</div></div>
+    <div><div class="logo-title">QA Team</div><div class="logo-sub">Daily Update</div></div>
   </div>
-
-  <!-- STEP 1: Connect -->
-  <div id="sec-connect" class="card">
-    <div class="card-title">Jira Connection</div>
-    <div class="info-box">🔐 Your PAT authenticates directly with your Jira server. When hosted on GitHub Pages, use the Cloudflare Worker Proxy URL to bypass HTTPS restrictions.</div>
-
-    <div class="field-group single" style="margin-bottom:14px">
-      <div class="field">
-        <label>Cloudflare Worker Proxy URL <span style="color:var(--warning);font-size:9px;text-transform:none;letter-spacing:0">(required for GitHub Pages)</span></label>
-        <input type="text" id="proxyUrl" placeholder="https://jira-proxy.yourname.workers.dev" />
-        <div class="hint">Deploy cloudflare-worker.js → paste your worker URL here. Leave blank if running locally (localhost).</div>
-      </div>
-    </div>
-
-    <div class="field-group single" style="margin-bottom:14px">
-      <div class="field">
-        <label>Jira Base URL <span style="color:var(--muted);font-size:9px;text-transform:none;letter-spacing:0">(used by the worker to reach your server)</span></label>
-        <input type="text" id="jiraUrl" placeholder="http://jdac.unilogcorp.com" />
-        <div class="hint">Your internal Jira server URL — the Worker forwards requests here on your behalf</div>
-      </div>
-    </div>
-
-    <div class="field-group" style="margin-bottom:14px">
-      <div class="field">
-        <label>Personal Access Token (PAT)</label>
-        <input type="password" id="jiraPat" placeholder="Enter your PAT" />
-        <div class="hint">Jira → Profile → Personal Access Tokens</div>
-      </div>
-      <div class="field">
-        <label>Cases Updated From</label>
-        <input type="date" id="dateFrom" />
-        <div class="hint">Default: today. Change to fetch a different day.</div>
-      </div>
-    </div>
-    <div class="actions">
-      <button class="btn btn-primary" onclick="connect()">🔌 Connect to Jira</button>
-    </div>
-    <div class="status-bar" id="conn-status">Enter your Jira URL and PAT to begin.</div>
-  </div>
-
-  <!-- STEP 2: Add Members Manually -->
-  <div id="sec-group" class="card section-hidden">
-    <div class="card-title">Add Team Members</div>
-    <div class="info-box" id="connected-as-box"></div>
-
-    <div class="field-group single" style="margin-bottom:14px">
-      <div class="field">
-        <label>Team Name (optional)</label>
-        <input type="text" id="teamName" placeholder="e.g. QA Services, QA Team" />
-        <div class="hint">Used as a label in the summary — can be anything</div>
-      </div>
-    </div>
-
-    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;margin-bottom:10px">ADD MEMBERS</div>
-
-    <div style="display:flex;gap:10px;margin-bottom:12px">
-      <input type="text" id="memberUsername" placeholder="Jira username (e.g. john.doe)" style="flex:1" />
-      <input type="text" id="memberDisplay" placeholder="Display name (e.g. John Doe)" style="flex:1" />
-      <button class="btn btn-primary btn-sm" onclick="addMember()" style="white-space:nowrap">+ Add</button>
-    </div>
-
-    <div id="members-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
-      <div style="color:var(--muted);font-size:12px" id="no-members-hint">No members added yet. Add at least one member above.</div>
-    </div>
-
-    <div class="actions">
-      <button class="btn btn-primary" id="confirmMembersBtn" onclick="confirmMembers()" disabled>👥 Confirm Team & Continue</button>
-      <button class="btn btn-secondary" onclick="goTo(1)">← Back</button>
-    </div>
-    <div class="status-bar" id="group-status">Add your team members to continue.</div>
-  </div>
-
-  <!-- STEP 3: Fetch Cases -->
-  <div id="sec-fetch" class="card section-hidden">
-    <div class="card-title">Fetch Team Cases</div>
-    <div id="members-preview" style="margin-bottom:16px"></div>
-    <div class="field-group single" style="margin-bottom:14px">
-      <div class="field">
-        <label>Project Keys (optional — leave blank for all projects)</label>
-        <input type="text" id="projectKeys" placeholder="e.g. QA, TEST — leave blank to auto-discover" />
-        <div class="hint">Leave blank to search across all Jira projects automatically</div>
-      </div>
-    </div>
-    <div class="actions">
-      <button class="btn btn-primary" id="fetchBtn" onclick="fetchTeamCases()">⚡ Fetch All Members' Cases</button>
-      <button class="btn btn-secondary" onclick="goTo(2)">← Back</button>
-    </div>
-    <div class="status-bar" id="fetch-status">Ready to fetch.</div>
-    <div class="progress-bar-wrap section-hidden" id="progress-wrap">
-      <div class="progress-label" id="progress-label">Fetching...</div>
-      <div class="progress-bar-bg"><div class="progress-bar-fill" id="progress-fill" style="width:0%"></div></div>
+  <nav class="sidebar-nav">
+    <div class="nav-section">Main</div>
+    <button class="nav-item active" onclick="goSection('today',this)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Team Update
+    </button>
+    <button class="nav-item" onclick="goSection('leaderboard',this)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 20 18 10"/><polyline points="12 20 12 4"/><polyline points="6 20 6 14"/></svg>
+      Leaderboard
+    </button>
+    <button class="nav-item" onclick="goSection('trends',this)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Weekly Trends
+    </button>
+    <button class="nav-item" onclick="goSection('history',this)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      History
+    </button>
+    <div class="nav-section">Config</div>
+    <button class="nav-item" onclick="goSection('settings',this)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+      Settings
+    </button>
+  </nav>
+  <div class="sidebar-footer">
+    <div style="display:flex;align-items:center;font-size:11px;color:var(--muted)">
+      <span class="conn-dot off" id="conn-dot"></span>
+      <span id="sidebar-conn-text">Not connected</span>
     </div>
   </div>
+</div>
 
-  <!-- STEP 4: Per-member results -->
-  <div id="sec-results" class="section-hidden">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
-      <div style="font-family:var(--mono);font-size:12px;color:var(--muted)">TEAM RESULTS — <span id="result-date"></span></div>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-secondary btn-sm" onclick="goTo(3)">← Back</button>
-        <button class="btn btn-success btn-sm" onclick="copyAllSummary()">📋 Copy Full Team Summary</button>
+<!-- MAIN -->
+<main class="main">
+
+  <!-- TODAY -->
+  <section id="section-today" class="section active">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Team QA Daily Update</h1>
+        <p class="page-sub" id="page-date"></p>
+      </div>
+      <div class="header-actions">
+        <span class="due-badge">Due 6:00 PM IST</span>
+        <input type="date" id="fetch-date"/>
+        <button class="btn btn-outline btn-sm btn-csv" onclick="exportCSV()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export CSV
+        </button>
+        <button class="btn btn-primary" id="fetch-btn" onclick="fetchAll()" disabled>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          Fetch All Members
+        </button>
       </div>
     </div>
 
-    <!-- Team overview -->
-    <div class="card" style="padding:16px;margin-bottom:12px">
-      <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:10px;letter-spacing:1px">TEAM OVERVIEW</div>
-      <div class="stats-row">
-        <div class="stat-card blue"><div class="num" id="team-total">0</div><div class="lbl">Total Cases</div></div>
-        <div class="stat-card green"><div class="num" id="team-closed">0</div><div class="lbl">Closed/Pushed</div></div>
-        <div class="stat-card orange"><div class="num" id="team-reopen">0</div><div class="lbl">Reopened</div></div>
-        <div class="stat-card red"><div class="num" id="team-members">0</div><div class="lbl">Members</div></div>
+    <div class="conn-bar">
+      <div class="conn-bar-inner cbi-off" id="conn-bar-inner">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <span id="conn-bar-text">Not connected — go to Settings to add your PAT</span>
+        <button class="btn btn-sm btn-outline" onclick="goSection('settings',null)">Settings</button>
       </div>
     </div>
+
+    <!-- Team overview stats -->
+    <div id="team-overview" class="section-hidden">
+      <div class="stats-grid" id="team-stats"></div>
+    </div>
+
+    <div class="prog-wrap section-hidden" id="prog-wrap">
+      <div class="prog-lbl" id="prog-lbl">Fetching...</div>
+      <div class="prog-bg"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
+    </div>
+    <div class="sbar section-hidden" id="fetch-status"></div>
 
     <!-- Member tabs -->
-    <div class="tab-container">
-      <div class="member-tabs-bar" id="member-tabs-bar"></div>
-      <div id="member-panels"></div>
+    <div class="tab-container section-hidden" id="tab-container">
+      <div class="tabs-bar" id="tabs-bar"></div>
+      <div id="panels"></div>
     </div>
-  </div>
 
-</div>
+    <a href="https://teams.microsoft.com" target="_blank" class="btn btn-outline" style="margin-top:6px;font-size:12px">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Open Microsoft Teams
+    </a>
+  </section>
+
+  <!-- LEADERBOARD -->
+  <section id="section-leaderboard" class="section">
+    <div class="page-header">
+      <div><h1 class="page-title">Leaderboard</h1><p class="page-sub">Today's team performance ranking</p></div>
+      <div class="header-actions">
+        <button class="btn btn-outline btn-sm" onclick="renderLeaderboard()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          Refresh
+        </button>
+      </div>
+    </div>
+    <div class="card" id="lb-card">
+      <div class="empty-state">Fetch team data first to see the leaderboard.</div>
+    </div>
+  </section>
+
+  <!-- TRENDS -->
+  <section id="section-trends" class="section">
+    <div class="page-header">
+      <div><h1 class="page-title">Weekly Trends</h1><p class="page-sub">Pushed vs Reopened — last 7 days</p></div>
+      <div class="header-actions">
+        <button class="btn btn-primary btn-sm" onclick="fetchTrends()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          Fetch 7-Day Data
+        </button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Team totals — last 7 days</div>
+      <div class="chart-wrap"><canvas id="trend-chart"></canvas></div>
+    </div>
+    <div class="card" id="trend-member-charts">
+      <div class="empty-state">Click "Fetch 7-Day Data" to load trends.</div>
+    </div>
+    <div class="sbar section-hidden" id="trend-status"></div>
+  </section>
+
+  <!-- HISTORY -->
+  <section id="section-history" class="section">
+    <div class="page-header">
+      <div><h1 class="page-title">History</h1><p class="page-sub">Past 30 days of fetched data</p></div>
+      <div class="header-actions">
+        <button class="btn btn-outline btn-sm" style="border-color:rgba(240,82,82,0.4);color:var(--danger)" onclick="clearHistory()">Clear History</button>
+      </div>
+    </div>
+    <div id="history-list"><div class="empty-state">No history yet. Fetch team data to start recording.</div></div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="section-settings" class="section">
+    <div class="page-header">
+      <div><h1 class="page-title">Settings</h1><p class="page-sub">Jira connection, JQL queries, team members</p></div>
+    </div>
+
+    <div class="settings-card">
+      <div class="s-title">Jira Connection</div>
+      <div class="s-field">
+        <label class="s-label">Cloudflare Worker Proxy URL <span style="font-size:10px;color:var(--success);text-transform:none;letter-spacing:0;font-weight:400">(required for GitHub Pages)</span></label>
+        <input type="text" id="s-proxy" class="s-input" placeholder="https://dark-lab-7cb3.gouthamlokesh8.workers.dev"/>
+        <div class="s-hint">Leave blank when running on localhost.</div>
+      </div>
+      <div class="s-field">
+        <label class="s-label">Jira Base URL</label>
+        <input type="text" id="s-url" class="s-input" value="https://jdac.unilogcorp.com"/>
+      </div>
+      <div class="s-field">
+        <label class="s-label">Personal Access Token (PAT)</label>
+        <div class="pat-row">
+          <input type="password" id="s-pat" class="s-input" placeholder="Paste your PAT…" autocomplete="off"/>
+          <button class="btn btn-primary" onclick="connectPAT()">Connect</button>
+        </div>
+        <div class="s-hint">Generate: <a href="https://jdac.unilogcorp.com/secure/ViewProfile.jspa" target="_blank">Jira → Profile → Personal Access Tokens</a><br/>Stored only in your browser's localStorage.</div>
+      </div>
+      <div class="conn-result" id="conn-result"></div>
+      <div id="user-row" style="display:none">
+        <div class="user-card">
+          <div class="user-avatar" id="u-avatar">GL</div>
+          <div><div style="font-weight:600" id="u-name"></div><div style="font-size:11px;color:var(--muted)" id="u-email"></div></div>
+          <button class="btn btn-danger" style="margin-left:auto" onclick="disconnectPAT()">Disconnect</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-card">
+      <div class="s-title">JQL Queries</div>
+      <div class="info-box"><code>BY currentUser()</code> is automatically replaced with each member's username when fetching.</div>
+      <div class="s-field">
+        <label class="s-label">Reopened cases</label>
+        <textarea class="s-input s-jql" id="s-jql-reopen" rows="3"></textarea>
+      </div>
+      <div class="s-field">
+        <label class="s-label">Pushed to customer</label>
+        <textarea class="s-input s-jql" id="s-jql-pushed" rows="3"></textarea>
+      </div>
+      <div class="s-field">
+        <label class="s-label">Currently in QA queue</label>
+        <textarea class="s-input s-jql" id="s-jql-queue" rows="2"></textarea>
+        <div class="s-hint">Cases currently assigned and open in QA stage — shows workload.</div>
+      </div>
+      <div class="s-field">
+        <label class="s-label">Aging threshold (days)</label>
+        <input type="number" id="s-aging" class="s-input" value="3" min="1" max="30" style="width:100px"/>
+        <div class="s-hint">Cases not updated for this many days are flagged as aging.</div>
+      </div>
+      <button class="btn btn-primary" onclick="saveSettings()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        Save Settings
+      </button>
+    </div>
+
+    <div class="settings-card">
+      <div class="s-title">Team Members</div>
+      <div class="info-box">Enter email (<code>Goutham.L@unilogcorp.com</code>) or username (<code>Goutham.L</code>) — email domain is stripped automatically.</div>
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <input type="text" id="m-user" class="s-input" placeholder="Email or username" style="flex:1;min-width:160px"/>
+        <input type="text" id="m-disp" class="s-input" placeholder="Display name (auto-generated)" style="flex:1;min-width:140px"/>
+        <button class="btn btn-primary" onclick="addMember()">+ Add</button>
+      </div>
+      <div id="members-list"></div>
+      <div id="no-members" style="color:var(--muted);font-size:12px;padding:6px 0">No members added yet.</div>
+    </div>
+  </section>
+
+</main>
+<div class="toast" id="toast"></div>
+
 <script>
-let cfg = {};
-let selectedGroup = null;
-let teamMembers = [];
-let teamData = {};
+// ── Constants ──────────────────────────────────────────────────────
+const DEFAULT_JQL_REOPEN = `(status CHANGED FROM "QA STAGE" TO ("DEV STAGE","DEV QUEUE","BACKLOG") BY currentUser() AFTER startOfDay() OR status CHANGED FROM "QA PRODUCTION" TO ("DEV PRODUCTION","DEV STAGE") BY currentUser() AFTER startOfDay()) ORDER BY updated DESC`;
+const DEFAULT_JQL_PUSHED = `(status CHANGED FROM "QA STAGE" TO "APPROVAL STAGE" BY currentUser() AFTER startOfDay() OR status CHANGED FROM "QA PRODUCTION" TO "APPROVAL PRODUCTION" BY currentUser() AFTER startOfDay()) ORDER BY updated DESC`;
+const DEFAULT_JQL_QUEUE  = `assignee = currentUser() AND status in ("QA STAGE","QA PRODUCTION") ORDER BY priority DESC, updated ASC`;
 
-document.getElementById('dateFrom').value = new Date().toISOString().split('T')[0];
+// ── State ──────────────────────────────────────────────────────────
+let pat='', proxyUrl='', jiraUrl='', connectedUser=null;
+let teamMembers=[], teamData={};
+let jqlReopen='', jqlPushed='', jqlQueue='', agingDays=3;
+let trendChart=null;
 
-function setStep(n) {
-  [1,2,3,4].forEach(i => {
-    const el = document.getElementById(`s${i}`);
-    el.className = 'step' + (i < n ? ' done' : i === n ? ' active' : '');
+// ── Init ───────────────────────────────────────────────────────────
+window.onload = () => {
+  document.getElementById('page-date').textContent = getISTDateLabel() + ' — ' + getISTTime() + ' IST';
+  document.getElementById('fetch-date').value = getISTToday();
+
+  pat        = localStorage.getItem('qa_pat') || '';
+  proxyUrl   = localStorage.getItem('qa_proxy') || '';
+  jiraUrl    = localStorage.getItem('qa_jira_url') || 'https://jdac.unilogcorp.com';
+  jqlReopen  = localStorage.getItem('qa_jql_reopen') || DEFAULT_JQL_REOPEN;
+  jqlPushed  = localStorage.getItem('qa_jql_pushed') || DEFAULT_JQL_PUSHED;
+  jqlQueue   = localStorage.getItem('qa_jql_queue') || DEFAULT_JQL_QUEUE;
+  agingDays  = parseInt(localStorage.getItem('qa_aging') || '3');
+  teamMembers= JSON.parse(localStorage.getItem('qa_members') || '[]');
+
+  document.getElementById('s-proxy').value = proxyUrl;
+  document.getElementById('s-url').value   = jiraUrl;
+  document.getElementById('s-pat').value   = pat ? '••••••••••••••••' : '';
+  document.getElementById('s-jql-reopen').value = jqlReopen;
+  document.getElementById('s-jql-pushed').value = jqlPushed;
+  document.getElementById('s-jql-queue').value  = jqlQueue;
+  document.getElementById('s-aging').value = agingDays;
+
+  renderMemberList();
+  renderHistoryList();
+  if (pat) tryAutoConnect();
+
+  document.addEventListener('keydown', e => {
+    if (e.key==='Enter' && (document.activeElement.id==='m-user'||document.activeElement.id==='m-disp')) addMember();
   });
-}
-function show(id) { document.getElementById(id).classList.remove('section-hidden'); }
-function hide(id) { document.getElementById(id).classList.add('section-hidden'); }
-function showStatus(id, msg, type='') {
-  const el = document.getElementById(id);
-  el.className = 'status-bar ' + type;
-  el.innerHTML = type === 'loading' ? `<div class="spinner"></div> ${msg}` : msg;
-}
-function goTo(step) {
-  ['sec-connect','sec-group','sec-fetch','sec-results'].forEach(id => hide(id));
-  const ids = ['','sec-connect','sec-group','sec-fetch','sec-results'];
-  show(ids[step]);
-  setStep(step);
-}
-function getUrl() {
-  let url = document.getElementById('jiraUrl').value.trim().replace(/\/$/, '');
-  if (url && !url.startsWith('http://') && !url.startsWith('https://')) url = 'http://' + url;
-  return url;
-}
-function getProxy() {
-  return document.getElementById('proxyUrl').value.trim().replace(/\/$/, '');
-}
-// Build the request URL — use proxy if set, otherwise call Jira directly
-function buildReqUrl(path) {
-  const proxy = getProxy();
-  if (proxy) {
-    // Existing worker uses /jira/ prefix: proxy/jira/rest/api/2/...
-    return `${proxy}/jira${path}`;
-  }
-  // Direct mode: local/localhost usage
-  return `${cfg.url}${path}`;
+};
+
+// ── IST helpers ────────────────────────────────────────────────────
+function getISTToday() { return new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Kolkata'}); }
+function getISTDateLabel() { return new Date().toLocaleDateString('en-IN',{timeZone:'Asia/Kolkata',weekday:'long',day:'numeric',month:'long',year:'numeric'}); }
+function getISTTime() { return new Date().toLocaleTimeString('en-IN',{timeZone:'Asia/Kolkata',hour:'2-digit',minute:'2-digit'}); }
+
+// ── API ────────────────────────────────────────────────────────────
+function buildUrl(path) {
+  const p = proxyUrl.replace(/\/$/,'');
+  return p ? `${p}/jira${path}` : `${jiraUrl.replace(/\/$/,'')}${path}`;
 }
 async function jiraReq(path) {
-  const url = buildReqUrl(path);
-  const resp = await fetch(url, {
-    headers: { 'Authorization': `Bearer ${cfg.pat}`, 'Content-Type': 'application/json', 'Accept': 'application/json' }
+  const r = await fetch(buildUrl(path), {
+    headers:{'Authorization':`Bearer ${pat}`,'Content-Type':'application/json','Accept':'application/json'}
   });
-  if (!resp.ok) { const t = await resp.text(); throw new Error(`Jira ${resp.status}: ${t.slice(0,300)}`); }
-  return resp.json();
+  if (!r.ok) { const t=await r.text(); throw new Error(`${r.status}: ${t.slice(0,200)}`); }
+  return r.json();
 }
-function categorizePill(s) {
-  s = (s||'').toLowerCase();
-  if (s.includes('closed')||s.includes('resolved')||s.includes('done')||s.includes('pushed')) return 'pill-done';
-  if (s.includes('reopen')||s.includes('re-open')) return 'pill-reopen';
-  if (s.includes('progress')) return 'pill-progress';
-  return 'pill-todo';
-}
-function categorize(issues) {
-  return {
-    closed: issues.filter(i => { const s=(i.fields.status?.name||'').toLowerCase(); return s.includes('closed')||s.includes('resolved')||s.includes('done')||s.includes('pushed'); }),
-    reopened: issues.filter(i => { const s=(i.fields.status?.name||'').toLowerCase(); return s.includes('reopen')||s.includes('re-open'); }),
-    inProgress: issues.filter(i => { const s=(i.fields.status?.name||'').toLowerCase(); return s.includes('progress'); }),
-  };
-}
-function initials(name) { return (name||'?').split(/[\s.]+/).filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join(''); }
-function avatarColor(name) {
-  const colors=['#4f8ef7','#7c5cbf','#3ecf8e','#f5a623','#f05252','#06b6d4','#8b5cf6','#ec4899'];
-  let h=0; for(const c of (name||'')) h=(h*31+c.charCodeAt(0))&0xffff;
-  return colors[h%colors.length];
-}
-function copyField(id) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  navigator.clipboard.writeText(el.value).then(() => {
-    const btn = document.querySelector(`[data-copy="${id}"]`);
-    if (btn) { const o=btn.textContent; btn.textContent='✓'; btn.style.color='var(--success)'; setTimeout(()=>{btn.textContent=o;btn.style.color='';},1500); }
-  });
+function buildJql(template, username, date) {
+  let jql = template.replace(/currentUser\(\)/g, `"${username}"`);
+  const today = getISTToday();
+  if (date && date !== today) jql = jql.replace(/startOfDay\(\)/g, `"${date}"`);
+  return jql;
 }
 
-// ── Step 1: Connect ──
-async function connect() {
-  cfg.url = getUrl();
-  cfg.pat = document.getElementById('jiraPat').value.trim();
-  cfg.dateFrom = document.getElementById('dateFrom').value;
-  cfg.proxy = getProxy();
-  if (!cfg.pat) { showStatus('conn-status','⚠ Enter your PAT.','error'); return; }
-  if (!cfg.proxy && !cfg.url) { showStatus('conn-status','⚠ Enter either a Proxy URL or Jira Base URL.','error'); return; }
+// ── Utilities ──────────────────────────────────────────────────────
+function initials(n) { return (n||'?').split(/[\s.]+/).filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join(''); }
+function avatarColor(n) {
+  const c=['#4f8ef7','#7c5cbf','#3ecf8e','#f5a623','#f05252','#06b6d4','#8b5cf6','#ec4899'];
+  let h=0; for(const ch of (n||'')) h=(h*31+ch.charCodeAt(0))&0xffff; return c[h%c.length];
+}
+function showToast(m) {
+  const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+function goSection(id, el) {
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('section-'+id).classList.add('active');
+  if(el) el.classList.add('active');
+  if(id==='leaderboard') renderLeaderboard();
+  if(id==='history') renderHistoryList();
+}
+function showSbar(id, msg, type='') {
+  const el=document.getElementById(id);
+  el.classList.remove('section-hidden');
+  el.className='sbar '+(type==='loading'?'loading':type==='ok'?'ok':type==='err'?'err':'');
+  el.innerHTML = type==='loading'?`<div class="spinner"></div> ${msg}`:msg;
+}
+function getPriorityClass(p) {
+  const s=(p||'').toLowerCase();
+  if(s==='critical'||s==='blocker') return 'pri-critical';
+  if(s==='high'||s==='major') return 'pri-high';
+  if(s==='medium'||s==='normal') return 'pri-medium';
+  return 'pri-low';
+}
+function spillClass(s) {
+  s=(s||'').toLowerCase();
+  if(s.includes('approval')||s.includes('done')||s.includes('closed')||s.includes('resolved')) return 's-done';
+  if(s.includes('reopen')||s.includes('re-open')) return 's-reopen';
+  if(s.includes('progress')) return 's-progress';
+  return 's-todo';
+}
+function isAging(updatedStr) {
+  if(!updatedStr) return false;
+  const diff = (Date.now() - new Date(updatedStr).getTime()) / 86400000;
+  return diff >= agingDays;
+}
+function isOverdue(dueDateStr) {
+  if(!dueDateStr) return false;
+  return new Date(dueDateStr).getTime() < Date.now();
+}
+function parseUsername(input) { return input.includes('@') ? input.split('@')[0] : input; }
+function parseDisplay(uname, inputDisplay) {
+  if(inputDisplay) return inputDisplay;
+  return uname.replace(/\./g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+}
 
-  const mode = cfg.proxy ? `via Proxy → ${cfg.proxy}` : `direct → ${cfg.url}`;
-  showStatus('conn-status',`Connecting (${mode})...`,'loading');
+// ── Connection ─────────────────────────────────────────────────────
+async function tryAutoConnect() {
+  try { const me=await jiraReq('/rest/api/2/myself'); setConnected(me); } catch(e) { setDisconnected(); }
+}
+async function connectPAT() {
+  const inputPat=document.getElementById('s-pat').value.trim();
+  if(!inputPat||inputPat.includes('•')) { showConnResult('⚠ Enter a valid PAT.','err'); return; }
+  pat=inputPat;
+  proxyUrl=document.getElementById('s-proxy').value.trim().replace(/\/$/,'');
+  jiraUrl=document.getElementById('s-url').value.trim().replace(/\/$/,'');
+  showConnResult('Connecting...','');
   try {
-    const me = await jiraReq('/rest/api/2/myself');
-    cfg.me = me;
-    showStatus('conn-status',`✅ Connected as: ${me.displayName} (${me.emailAddress||me.name}) [${cfg.proxy ? 'Proxy mode' : 'Direct mode'}]`,'success');
-    document.getElementById('connected-as-box').textContent = `✅ Connected as ${me.displayName} — add your QA team members below.`;
-    goTo(2);
-  } catch(e) { showStatus('conn-status',`❌ ${e.message}`,'error'); }
+    const me=await jiraReq('/rest/api/2/myself');
+    localStorage.setItem('qa_pat',pat);
+    localStorage.setItem('qa_proxy',proxyUrl);
+    localStorage.setItem('qa_jira_url',jiraUrl);
+    setConnected(me);
+    showConnResult(`✅ Connected as ${me.displayName}`,'ok');
+  } catch(e) { showConnResult(`❌ ${e.message}`,'err'); }
+}
+function setConnected(me) {
+  connectedUser=me;
+  document.getElementById('conn-dot').className='conn-dot on';
+  document.getElementById('sidebar-conn-text').textContent=me.displayName;
+  document.getElementById('conn-bar-inner').className='conn-bar-inner cbi-on';
+  document.getElementById('conn-bar-text').textContent=`Connected as ${me.displayName} (${me.emailAddress||me.name})`;
+  document.getElementById('fetch-btn').disabled=false;
+  document.getElementById('u-avatar').textContent=initials(me.displayName);
+  document.getElementById('u-name').textContent=me.displayName;
+  document.getElementById('u-email').textContent=me.emailAddress||me.name;
+  document.getElementById('user-row').style.display='block';
+}
+function setDisconnected() {
+  connectedUser=null;
+  document.getElementById('conn-dot').className='conn-dot off';
+  document.getElementById('sidebar-conn-text').textContent='Not connected';
+  document.getElementById('conn-bar-inner').className='conn-bar-inner cbi-off';
+  document.getElementById('fetch-btn').disabled=true;
+  document.getElementById('user-row').style.display='none';
+}
+function disconnectPAT() {
+  pat=''; localStorage.removeItem('qa_pat');
+  document.getElementById('s-pat').value='';
+  setDisconnected(); showConnResult('Disconnected.','');
+}
+function showConnResult(m,t) {
+  const el=document.getElementById('conn-result');
+  el.textContent=m; el.className='conn-result '+t;
 }
 
-// ── Step 2: Manual member entry ──
+// ── Settings ───────────────────────────────────────────────────────
+function saveSettings() {
+  jqlReopen = document.getElementById('s-jql-reopen').value.trim();
+  jqlPushed = document.getElementById('s-jql-pushed').value.trim();
+  jqlQueue  = document.getElementById('s-jql-queue').value.trim();
+  agingDays = parseInt(document.getElementById('s-aging').value)||3;
+  proxyUrl  = document.getElementById('s-proxy').value.trim().replace(/\/$/,'');
+  jiraUrl   = document.getElementById('s-url').value.trim().replace(/\/$/,'');
+  localStorage.setItem('qa_jql_reopen',jqlReopen);
+  localStorage.setItem('qa_jql_pushed',jqlPushed);
+  localStorage.setItem('qa_jql_queue',jqlQueue);
+  localStorage.setItem('qa_aging',agingDays);
+  localStorage.setItem('qa_proxy',proxyUrl);
+  localStorage.setItem('qa_jira_url',jiraUrl);
+  showToast('✅ Settings saved!');
+}
+
+// ── Members ────────────────────────────────────────────────────────
 function addMember() {
-  const usernameEl = document.getElementById('memberUsername');
-  const displayEl = document.getElementById('memberDisplay');
-  const username = usernameEl.value.trim();
-  const displayName = displayEl.value.trim() || username;
-
-  if (!username) { showStatus('group-status','⚠ Enter a Jira username.','error'); return; }
-
-  // Check duplicate
-  if (teamMembers.find(m => m.name === username)) {
-    showStatus('group-status',`⚠ "${username}" is already added.`,'error');
-    return;
-  }
-
-  teamMembers.push({ name: username, displayName, emailAddress: '' });
-  usernameEl.value = '';
-  displayEl.value = '';
-  usernameEl.focus();
+  const raw=document.getElementById('m-user').value.trim();
+  const inputDisp=document.getElementById('m-disp').value.trim();
+  if(!raw){showToast('⚠ Enter a username or email.');return;}
+  const uname=parseUsername(raw);
+  const display=parseDisplay(uname,inputDisp);
+  if(teamMembers.find(m=>m.name.toLowerCase()===uname.toLowerCase())){showToast(`"${uname}" already added.`);return;}
+  teamMembers.push({name:uname,displayName:display,email:raw.includes('@')?raw:''});
+  localStorage.setItem('qa_members',JSON.stringify(teamMembers));
+  document.getElementById('m-user').value='';
+  document.getElementById('m-disp').value='';
   renderMemberList();
-  document.getElementById('confirmMembersBtn').disabled = false;
-  showStatus('group-status', `✅ ${teamMembers.length} member(s) added.`, 'success');
+  showToast(`✅ ${display} added!`);
 }
-
-// Allow pressing Enter to add member
-document.addEventListener('DOMContentLoaded', () => {
-  ['memberUsername','memberDisplay'].forEach(id => {
-    document.getElementById(id)?.addEventListener('keydown', e => { if (e.key === 'Enter') addMember(); });
-  });
-});
-
-function removeMember(username) {
-  teamMembers = teamMembers.filter(m => m.name !== username);
+function removeMember(uname) {
+  teamMembers=teamMembers.filter(m=>m.name!==uname);
+  localStorage.setItem('qa_members',JSON.stringify(teamMembers));
   renderMemberList();
-  if (!teamMembers.length) document.getElementById('confirmMembersBtn').disabled = true;
-  showStatus('group-status', teamMembers.length ? `✅ ${teamMembers.length} member(s).` : 'Add at least one member to continue.', teamMembers.length ? 'success' : '');
 }
-
 function renderMemberList() {
-  const list = document.getElementById('members-list');
-  const hint = document.getElementById('no-members-hint');
-  if (!teamMembers.length) {
-    list.innerHTML = '';
-    if (hint) hint.style.display = 'block';
-    return;
-  }
-  if (hint) hint.style.display = 'none';
-  list.innerHTML = teamMembers.map(m => `
-    <div style="display:flex;align-items:center;gap:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px">
-      <div class="avatar" style="background:${avatarColor(m.displayName)};width:28px;height:28px;font-size:10px">${initials(m.displayName)}</div>
-      <div style="flex:1">
-        <div style="font-size:13px;font-weight:600">${m.displayName}</div>
-        <div style="font-size:10px;color:var(--muted);font-family:var(--mono)">${m.name}</div>
-      </div>
-      <button onclick="removeMember('${m.name}')" style="background:none;border:1px solid var(--border);color:var(--danger);border-radius:6px;padding:3px 10px;cursor:pointer;font-size:11px">✕ Remove</button>
+  const list=document.getElementById('members-list');
+  const hint=document.getElementById('no-members');
+  if(!teamMembers.length){list.innerHTML='';hint.style.display='block';return;}
+  hint.style.display='none';
+  list.innerHTML=teamMembers.map(m=>`
+    <div class="m-item">
+      <div class="avatar" style="background:${avatarColor(m.displayName)};width:26px;height:26px;font-size:9px">${initials(m.displayName)}</div>
+      <div style="flex:1"><div class="m-name">${m.displayName}</div><div class="m-uname">${m.email||m.name} → <strong style="color:var(--accent)">${m.name}</strong></div></div>
+      <button class="rm-btn" onclick="removeMember('${m.name}')">✕</button>
     </div>`).join('');
 }
 
-function confirmMembers() {
-  if (!teamMembers.length) { showStatus('group-status','⚠ Add at least one member.','error'); return; }
-  selectedGroup = document.getElementById('teamName').value.trim() || 'QA Team';
+// ── Fetch All ──────────────────────────────────────────────────────
+async function fetchAll() {
+  if(!connectedUser){showToast('Not connected. Go to Settings.');return;}
+  if(!teamMembers.length){showToast('No team members. Add them in Settings.');return;}
+  const date=document.getElementById('fetch-date').value;
+  teamData={};
+  document.getElementById('prog-wrap').classList.remove('section-hidden');
+  document.getElementById('tab-container').classList.add('section-hidden');
+  document.getElementById('team-overview').classList.add('section-hidden');
+  document.getElementById('fetch-btn').disabled=true;
+  const fill=document.getElementById('prog-fill');
+  const lbl=document.getElementById('prog-lbl');
 
-  // Build preview for Step 3
-  const preview = document.getElementById('members-preview');
-  preview.innerHTML = `
-    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:8px;letter-spacing:1px">${teamMembers.length} MEMBERS — ${selectedGroup}</div>
-    <div style="display:flex;flex-wrap:wrap;gap:8px">
-      ${teamMembers.map(m=>`
-        <div style="display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:4px 12px 4px 8px">
-          <div class="avatar" style="background:${avatarColor(m.displayName)};width:20px;height:20px;font-size:8px">${initials(m.displayName)}</div>
-          <span style="font-size:12px">${m.displayName}</span>
-        </div>`).join('')}
-    </div>`;
-  goTo(3);
-}
+  for(let i=0;i<teamMembers.length;i++) {
+    const m=teamMembers[i];
+    fill.style.width=Math.round((i/teamMembers.length)*100)+'%';
+    lbl.textContent=`Fetching: ${m.displayName} (${i+1}/${teamMembers.length})`;
+    showSbar('fetch-status',`Fetching cases for ${m.displayName}...`,'loading');
 
-// ── Step 3: Fetch ──
-async function fetchTeamCases() {
-  if (!teamMembers.length) return;
-  const fetchBtn = document.getElementById('fetchBtn');
-  fetchBtn.disabled = true;
-  teamData = {};
-  show('progress-wrap');
-  const fill = document.getElementById('progress-fill');
-  const lbl = document.getElementById('progress-label');
+    let reopened=[],pushed=[],queue=[],allIssues=[];
+    try {
+      const r=await jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(buildJql(jqlReopen||DEFAULT_JQL_REOPEN,m.name,date))}&maxResults=100&fields=summary,status,updated,priority,duedate,project`);
+      reopened=r.issues||[];
+    } catch(e){console.warn('reopen',m.name,e.message);}
+    try {
+      const r=await jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(buildJql(jqlPushed||DEFAULT_JQL_PUSHED,m.name,date))}&maxResults=100&fields=summary,status,updated,priority,duedate,project`);
+      pushed=r.issues||[];
+    } catch(e){console.warn('pushed',m.name,e.message);}
+    try {
+      const r=await jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(buildJql(jqlQueue||DEFAULT_JQL_QUEUE,m.name,date))}&maxResults=100&fields=summary,status,updated,priority,duedate,project`);
+      queue=r.issues||[];
+    } catch(e){console.warn('queue',m.name,e.message);}
 
-  try {
-    let projectKeys = document.getElementById('projectKeys').value.split(',').map(s=>s.trim()).filter(Boolean);
-    if (!projectKeys.length) {
-      showStatus('fetch-status','Discovering all projects...','loading');
-      const pd = await jiraReq('/rest/api/2/project');
-      projectKeys = (pd||[]).map(p=>p.key);
-      showStatus('fetch-status',`Found ${projectKeys.length} projects. Fetching per member...`,'loading');
-    }
+    allIssues=[...new Map([...pushed,...reopened,...queue].map(i=>[i.key,i])).values()];
+    // Aging = in queue and not updated for N days
+    const aging=queue.filter(i=>isAging(i.fields.updated));
+    // Overdue = has duedate in past
+    const overdue=allIssues.filter(i=>isOverdue(i.fields.duedate));
+    // Priority breakdown from queue
+    const priorities={critical:0,high:0,medium:0,low:0};
+    queue.forEach(i=>{
+      const p=(i.fields.priority?.name||'').toLowerCase();
+      if(p==='critical'||p==='blocker') priorities.critical++;
+      else if(p==='high'||p==='major') priorities.high++;
+      else if(p==='medium'||p==='normal') priorities.medium++;
+      else priorities.low++;
+    });
+    // Reopen rate
+    const reopenRate = pushed.length > 0 ? Math.round((reopened.length/pushed.length)*100) : 0;
 
-    const projectJql = projectKeys.map(p=>`project="${p}"`).join(' OR ');
-    const dateJql = cfg.dateFrom ? ` AND updatedDate >= "${cfg.dateFrom}"` : '';
-
-    for (let i=0; i<teamMembers.length; i++) {
-      const member = teamMembers[i];
-      fill.style.width = Math.round((i/teamMembers.length)*100)+'%';
-      lbl.textContent = `Fetching: ${member.displayName} (${i+1}/${teamMembers.length})`;
-      showStatus('fetch-status',`Fetching cases for ${member.displayName}...`,'loading');
-
-      const uname = member.name || member.key;
-      const userClause = `(assignee="${uname}" OR reporter="${uname}")`;
-      const jql = encodeURIComponent(`(${projectJql}) AND ${userClause}${dateJql} ORDER BY updated DESC`);
-
-      let issues = [];
-      try {
-        const d = await jiraReq(`/rest/api/2/search?jql=${jql}&maxResults=200&fields=summary,status,updated,assignee,reporter,priority,project`);
-        issues = d.issues || [];
-      } catch(e) { console.warn(`Skipped ${member.displayName}:`, e.message); }
-
-      teamData[uname] = { member, issues, ...categorize(issues) };
-    }
-
-    fill.style.width = '100%';
-    lbl.textContent = `Done! Fetched cases for ${teamMembers.length} members.`;
-    showStatus('fetch-status',`✅ Complete — fetched cases for all ${teamMembers.length} members.`,'success');
-
-    renderResults();
-    goTo(4);
-  } catch(e) {
-    showStatus('fetch-status',`❌ ${e.message}`,'error');
-  } finally {
-    fetchBtn.disabled = false;
+    teamData[m.name]={member:m,reopened,pushed,queue,aging,overdue,priorities,reopenRate,allIssues};
   }
+
+  fill.style.width='100%';
+  lbl.textContent=`Done — fetched all ${teamMembers.length} members`;
+  showSbar('fetch-status',`✅ Successfully fetched data for all ${teamMembers.length} team members.`,'ok');
+
+  renderTeamOverview();
+  renderTabs(date);
+  saveToHistory(date);
+  document.getElementById('fetch-btn').disabled=false;
 }
 
-// ── Step 4: Render tabs ──
-function renderResults() {
-  const today = new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  document.getElementById('result-date').textContent = today;
+// ── Team Overview ──────────────────────────────────────────────────
+function renderTeamOverview() {
+  const allPushed=Object.values(teamData).flatMap(d=>d.pushed);
+  const allReopen=Object.values(teamData).flatMap(d=>d.reopened);
+  const allQueue =Object.values(teamData).flatMap(d=>d.queue);
+  const allAging =Object.values(teamData).flatMap(d=>d.aging);
+  const allOverdue=Object.values(teamData).flatMap(d=>d.overdue);
+  const teamRate = allPushed.length>0?Math.round((allReopen.length/allPushed.length)*100):0;
 
-  const allIssues = Object.values(teamData).flatMap(d=>d.issues);
-  const allClosed = Object.values(teamData).flatMap(d=>d.closed);
-  const allReopen = Object.values(teamData).flatMap(d=>d.reopened);
-  document.getElementById('team-total').textContent = allIssues.length;
-  document.getElementById('team-closed').textContent = allClosed.length;
-  document.getElementById('team-reopen').textContent = allReopen.length;
-  document.getElementById('team-members').textContent = teamMembers.length;
+  document.getElementById('team-stats').innerHTML=`
+    <div class="stat"><div class="stat-num c-green">${allPushed.length}</div><div class="stat-lbl">Pushed Today</div></div>
+    <div class="stat"><div class="stat-num c-orange">${allReopen.length}</div><div class="stat-lbl">Reopened</div></div>
+    <div class="stat"><div class="stat-num c-blue">${allQueue.length}</div><div class="stat-lbl">In QA Queue</div></div>
+    <div class="stat"><div class="stat-num c-red">${allAging.length}</div><div class="stat-lbl">Aging (${agingDays}d+)</div></div>
+    <div class="stat"><div class="stat-num c-red">${allOverdue.length}</div><div class="stat-lbl">Overdue</div></div>
+    <div class="stat"><div class="stat-num" style="color:${teamRate>30?'var(--danger)':teamRate>10?'var(--warning)':'var(--success)'}">${teamRate}%</div><div class="stat-lbl">Reopen Rate</div></div>
+    <div class="stat"><div class="stat-num c-teal">${teamMembers.length}</div><div class="stat-lbl">Members</div></div>`;
+  document.getElementById('team-overview').classList.remove('section-hidden');
+}
 
-  const tabsBar = document.getElementById('member-tabs-bar');
-  const panels = document.getElementById('member-panels');
-  tabsBar.innerHTML = '';
-  panels.innerHTML = '';
+// ── Member Tabs ────────────────────────────────────────────────────
+function renderTabs(date) {
+  const bar=document.getElementById('tabs-bar');
+  const panels=document.getElementById('panels');
+  bar.innerHTML=''; panels.innerHTML='';
+  const today=date===getISTToday()?getISTDateLabel():new Date(date+'T00:00:00').toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
-  Object.entries(teamData).forEach(([uname, d], idx) => {
-    const color = avatarColor(d.member.displayName);
-    // Tab
-    const tab = document.createElement('button');
-    tab.className = 'member-tab' + (idx===0?' active':'');
-    tab.onclick = () => {
-      document.querySelectorAll('.member-tab').forEach((t,i)=>t.classList.toggle('active',i===idx));
-      document.querySelectorAll('.member-panel').forEach((p,i)=>p.classList.toggle('active',i===idx));
+  teamMembers.forEach((m,idx)=>{
+    const d=teamData[m.name];
+    const total=(d?.pushed?.length||0)+(d?.reopened?.length||0);
+    const hasAlerts=(d?.aging?.length||0)+(d?.overdue?.length||0);
+    const color=avatarColor(m.displayName);
+
+    const tab=document.createElement('button');
+    tab.className='tab-btn'+(idx===0?' active':'');
+    tab.onclick=()=>{
+      document.querySelectorAll('.tab-btn').forEach((t,i)=>t.classList.toggle('active',i===idx));
+      document.querySelectorAll('.tab-panel').forEach((p,i)=>p.classList.toggle('active',i===idx));
     };
-    tab.innerHTML = `<div class="avatar" style="background:${color};width:18px;height:18px;font-size:8px">${initials(d.member.displayName)}</div>${d.member.displayName.split(' ')[0]}<span class="tab-count">${d.issues.length}</span>`;
-    tabsBar.appendChild(tab);
+    tab.innerHTML=`<div class="avatar" style="background:${color};width:18px;height:18px;font-size:8px">${initials(m.displayName)}</div>${m.displayName.split(' ')[0]}<span class="tab-count">${total}</span>${hasAlerts?`<span style="color:var(--danger);font-size:10px">⚠</span>`:''}`;
+    bar.appendChild(tab);
 
-    // Panel
-    const panel = document.createElement('div');
-    panel.className = 'member-panel' + (idx===0?' active':'');
-    panel.innerHTML = buildPanel(uname, d, idx, today);
+    const panel=document.createElement('div');
+    panel.className='tab-panel'+(idx===0?' active':'');
+    panel.innerHTML=buildPanel(d,idx,today,m);
     panels.appendChild(panel);
   });
+  document.getElementById('tab-container').classList.remove('section-hidden');
 }
 
-function buildPanel(uname, d, idx, today) {
-  const { member, issues, closed, reopened, inProgress } = d;
-  const color = avatarColor(member.displayName);
-  const mid = `m${idx}`;
+function buildPanel(d,idx,today,m) {
+  if(!d) return `<div class="empty-state">No data fetched for this member.</div>`;
+  const {pushed,reopened,queue,aging,overdue,priorities,reopenRate}=d;
+  const mid=`m${idx}`;
+  const color=avatarColor(m.displayName);
 
-  const keyUpdates = `QA Daily Update — ${today}\nMember: ${member.displayName} (${member.emailAddress||member.name})\n\nTotal cases: ${issues.length}\nClosed/Pushed: ${closed.length}\nReopened: ${reopened.length}\nIn Progress: ${inProgress.length}`;
+  const pushedList=pushed.length?pushed.map(i=>`• ${i.key} — ${i.fields.summary}`).join('\n'):'No cases pushed to customer today.';
+  const reopenList=reopened.length?reopened.map(i=>`• ${i.key} — ${i.fields.summary}`).join('\n'):'No cases reopened today.';
+  const keyUpdates=`QA Daily Update — ${today}\nMember: ${m.displayName}\n\nPushed to customer: ${pushed.length}\nReopened: ${reopened.length}\nCurrently in QA queue: ${queue.length}\nReopen rate: ${reopenRate}%`;
 
-  const closedList = closed.length
-    ? closed.map(i=>`• ${i.key} — ${i.fields.summary}`).join('\n')
-    : 'No cases closed/pushed today.';
+  const pushedRows=pushed.map(i=>`<tr>
+    <td><span class="tkey">${i.key}</span></td>
+    <td style="max-width:240px;font-size:11px">${i.fields.summary||''}</td>
+    <td><span class="spill ${spillClass(i.fields.status?.name)}">${i.fields.status?.name||''}</span></td>
+    <td>${i.fields.priority?.name?`<span class="spill ${getPriorityClass(i.fields.priority.name)}">${i.fields.priority.name}</span>`:''}</td>
+  </tr>`).join('');
 
-  const reopenList = reopened.length
-    ? reopened.map(i=>`• ${i.key} — ${i.fields.summary}`).join('\n')
-    : 'No cases reopened today.';
+  const reopenRows=reopened.map(i=>`<tr>
+    <td><span class="tkey">${i.key}</span></td>
+    <td style="max-width:240px;font-size:11px">${i.fields.summary||''}</td>
+    <td><span class="spill ${spillClass(i.fields.status?.name)}">${i.fields.status?.name||''}</span></td>
+    <td>${i.fields.priority?.name?`<span class="spill ${getPriorityClass(i.fields.priority.name)}">${i.fields.priority.name}</span>`:''}</td>
+  </tr>`).join('');
 
-  const plansList = inProgress.length
-    ? `Continue working on:\n${inProgress.slice(0,5).map(i=>`• ${i.key} — ${i.fields.summary}`).join('\n')}`
-    : 'Continue with assigned QA tasks.';
-
-  const rows = issues.map(i => {
-    const upd = i.fields.updated ? new Date(i.fields.updated).toLocaleDateString('en-IN',{day:'2-digit',month:'short'}) : '-';
+  const queueRows=queue.map(i=>{
+    const aged=isAging(i.fields.updated);
+    const od=isOverdue(i.fields.duedate);
     return `<tr>
-      <td><span class="ticket-key">${i.key}</span></td>
-      <td style="color:var(--muted);font-size:10px;white-space:nowrap">${i.fields.project?.key||''}</td>
-      <td style="max-width:260px;font-size:11px;color:var(--text)">${i.fields.summary||''}</td>
-      <td><span class="status-pill ${categorizePill(i.fields.status?.name)}">${i.fields.status?.name||''}</span></td>
-      <td style="color:var(--muted);font-size:10px;white-space:nowrap">${upd}</td>
-    </tr>`;
-  }).join('');
+      <td><span class="tkey">${i.key}</span></td>
+      <td style="max-width:200px;font-size:11px">${i.fields.summary||''}</td>
+      <td>${i.fields.priority?.name?`<span class="spill ${getPriorityClass(i.fields.priority.name)}">${i.fields.priority.name}</span>`:''}</td>
+      <td>${aged?'<span class="spill s-reopen">Aging</span>':''}${od?'<span class="spill s-overdue" style="margin-left:4px">Overdue</span>':''}</td>
+      <td style="color:var(--muted);font-size:10px">${i.fields.duedate||'—'}</td>
+    </tr>`;}).join('');
+
+  const agingAlert = aging.length ? `<div class="alert alert-warning">⏰ <strong>${aging.length} aging case${aging.length>1?'s':''}</strong> — not updated in ${agingDays}+ days: ${aging.map(i=>i.key).join(', ')}</div>` : '';
+  const overdueAlert = overdue.length ? `<div class="alert alert-danger">🔴 <strong>${overdue.length} overdue case${overdue.length>1?'s':''}</strong> — past due date: ${overdue.map(i=>i.key).join(', ')}</div>` : '';
 
   return `
-  <div class="member-header">
-    <div class="avatar" style="background:${color};width:38px;height:38px;font-size:14px;border-radius:50%">${initials(member.displayName)}</div>
-    <div>
-      <div class="member-name">${member.displayName}</div>
-      <div class="member-email">${member.emailAddress||member.name}</div>
-    </div>
+  <div class="member-hdr">
+    <div class="avatar" style="background:${color};width:38px;height:38px;font-size:14px">${initials(m.displayName)}</div>
+    <div><div class="member-name">${m.displayName}</div><div class="member-sub">${m.email||m.name}</div></div>
     <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">
-      <span style="background:rgba(79,142,247,0.1);color:var(--accent);border-radius:4px;padding:3px 8px;font-size:10px;font-family:var(--mono)">${issues.length} total</span>
-      <span style="background:rgba(62,207,142,0.1);color:var(--success);border-radius:4px;padding:3px 8px;font-size:10px;font-family:var(--mono)">${closed.length} closed</span>
-      <span style="background:rgba(245,166,35,0.1);color:var(--warning);border-radius:4px;padding:3px 8px;font-size:10px;font-family:var(--mono)">${reopened.length} reopened</span>
+      <span style="background:rgba(62,207,142,0.1);color:var(--success);border-radius:4px;padding:2px 8px;font-size:10px;font-family:var(--mono)">${pushed.length} pushed</span>
+      <span style="background:rgba(245,166,35,0.1);color:var(--warning);border-radius:4px;padding:2px 8px;font-size:10px;font-family:var(--mono)">${reopened.length} reopened</span>
+      <span style="background:rgba(79,142,247,0.1);color:var(--accent);border-radius:4px;padding:2px 8px;font-size:10px;font-family:var(--mono)">${queue.length} in queue</span>
+      <span style="background:rgba(240,82,82,0.1);color:var(--danger);border-radius:4px;padding:2px 8px;font-size:10px;font-family:var(--mono)">${reopenRate}% reopen rate</span>
     </div>
   </div>
 
-  <div class="stats-row">
-    <div class="stat-card blue"><div class="num">${issues.length}</div><div class="lbl">Total</div></div>
-    <div class="stat-card green"><div class="num">${closed.length}</div><div class="lbl">Closed</div></div>
-    <div class="stat-card orange"><div class="num">${reopened.length}</div><div class="lbl">Reopened</div></div>
-    <div class="stat-card red"><div class="num">${inProgress.length}</div><div class="lbl">In Progress</div></div>
+  ${agingAlert}${overdueAlert}
+
+  <div class="mini-stats">
+    <div class="mini-stat"><div class="mini-num c-red">${priorities.critical}</div><div class="mini-lbl">Critical</div></div>
+    <div class="mini-stat"><div class="mini-num c-orange">${priorities.high}</div><div class="mini-lbl">High</div></div>
+    <div class="mini-stat"><div class="mini-num c-blue">${priorities.medium}</div><div class="mini-lbl">Medium</div></div>
+    <div class="mini-stat"><div class="mini-num" style="color:var(--muted)">${priorities.low}</div><div class="mini-lbl">Low</div></div>
+    <div class="mini-stat"><div class="mini-num c-red">${aging.length}</div><div class="mini-lbl">Aging</div></div>
+    <div class="mini-stat"><div class="mini-num c-red">${overdue.length}</div><div class="mini-lbl">Overdue</div></div>
   </div>
 
-  ${issues.length ? `
-  <div class="ticket-wrap">
-    <table>
-      <thead><tr><th>Key</th><th>Project</th><th>Summary</th><th>Status</th><th>Updated</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-  </div>` : `<div style="color:var(--muted);font-size:12px;padding:10px 0">No cases found for this member on the selected date.</div>`}
+  ${pushed.length?`<div style="font-family:var(--mono);font-size:10px;color:var(--success);margin:12px 0 6px;letter-spacing:0.5px">✅ PUSHED TO CUSTOMER (${pushed.length})</div>
+  <div class="tbl-wrap"><table><thead><tr><th>Key</th><th>Summary</th><th>Status</th><th>Priority</th></tr></thead><tbody>${pushedRows}</tbody></table></div>`
+  :'<div style="color:var(--muted);font-size:12px;margin:8px 0">No cases pushed to customer today.</div>'}
 
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-top:18px;margin-bottom:12px">
-    <div style="font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:1px">📋 TEAMS FORM — ${member.displayName.split(' ')[0].toUpperCase()}</div>
-    <button class="btn btn-success btn-sm" onclick="copyMemberAll('${mid}','${member.displayName.replace(/'/g,"\\'")}')">Copy All Fields</button>
+  ${reopened.length?`<div style="font-family:var(--mono);font-size:10px;color:var(--warning);margin:12px 0 6px;letter-spacing:0.5px">🔄 REOPENED (${reopened.length})</div>
+  <div class="tbl-wrap"><table><thead><tr><th>Key</th><th>Summary</th><th>Status</th><th>Priority</th></tr></thead><tbody>${reopenRows}</tbody></table></div>`
+  :'<div style="color:var(--muted);font-size:12px;margin:8px 0">No cases reopened today.</div>'}
+
+  ${queue.length?`<div style="font-family:var(--mono);font-size:10px;color:var(--accent);margin:12px 0 6px;letter-spacing:0.5px">📋 QA QUEUE (${queue.length})</div>
+  <div class="tbl-wrap"><table><thead><tr><th>Key</th><th>Summary</th><th>Priority</th><th>Flags</th><th>Due</th></tr></thead><tbody>${queueRows}</tbody></table></div>`:''}
+
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;margin-bottom:10px">
+    <div style="font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:1px">📋 TEAMS FORM — ${m.displayName.split(' ')[0].toUpperCase()}</div>
+    <button class="btn btn-success btn-sm" onclick="copyAll('${mid}','${m.displayName.replace(/'/g,"\\'")}')">Copy All Fields</button>
   </div>
 
-  <div class="out-field">
-    <div class="out-label">Key Updates <button class="copy-btn" data-copy="${mid}-ku" onclick="copyField('${mid}-ku')">Copy</button></div>
-    <textarea class="out" id="${mid}-ku" readonly>${keyUpdates}</textarea>
-  </div>
-  <div class="out-field">
-    <div class="out-label">Cases Pushed to Customer or Closed <button class="copy-btn" data-copy="${mid}-cc" onclick="copyField('${mid}-cc')">Copy</button></div>
-    <textarea class="out" id="${mid}-cc" readonly>${closedList}</textarea>
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
-    <div class="out-field" style="margin-bottom:0">
-      <div class="out-label">Count — Closed <button class="copy-btn" data-copy="${mid}-nc" onclick="copyField('${mid}-nc')">Copy</button></div>
-      <input class="out" id="${mid}-nc" type="text" readonly value="${closed.length}" />
+  <div class="form-body">
+    <div class="fld"><div class="fld-label">Key Updates <button class="copy-btn" onclick="cpTA('${mid}-ku',this)">Copy</button></div>
+      <textarea class="fld-ta" id="${mid}-ku" rows="3">${keyUpdates}</textarea></div>
+    <div class="fld"><div class="fld-label">Cases Pushed to Customer or Closed <button class="copy-btn" onclick="cpRO('${mid}-cc',this)">Copy</button></div>
+      <div class="fld-ro" id="${mid}-cc">${pushedList}</div></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      <div><div class="fld-label">Count — Pushed <button class="copy-btn" onclick="cpRO('${mid}-nc',this)">Copy</button></div>
+        <div class="fld-num c-green" id="${mid}-nc">${pushed.length}</div></div>
+      <div><div class="fld-label">Count — Reopened <button class="copy-btn" onclick="cpRO('${mid}-nr',this)">Copy</button></div>
+        <div class="fld-num c-orange" id="${mid}-nr">${reopened.length}</div></div>
     </div>
-    <div class="out-field" style="margin-bottom:0">
-      <div class="out-label">Count — Reopened <button class="copy-btn" data-copy="${mid}-nr" onclick="copyField('${mid}-nr')">Copy</button></div>
-      <input class="out" id="${mid}-nr" type="text" readonly value="${reopened.length}" />
-    </div>
-  </div>
-  <div class="out-field">
-    <div class="out-label">Cases Reopened <button class="copy-btn" data-copy="${mid}-cr" onclick="copyField('${mid}-cr')">Copy</button></div>
-    <textarea class="out" id="${mid}-cr" readonly>${reopenList}</textarea>
-  </div>
-  <div class="out-field">
-    <div class="out-label">Plans for Tomorrow <button class="copy-btn" data-copy="${mid}-pl" onclick="copyField('${mid}-pl')">Copy</button></div>
-    <textarea class="out" id="${mid}-pl" readonly>${plansList}</textarea>
-  </div>
-  <div class="out-field">
-    <div class="out-label">Additional Comments <button class="copy-btn" data-copy="${mid}-cm" onclick="copyField('${mid}-cm')">Copy</button></div>
-    <textarea class="out" id="${mid}-cm" readonly>Auto-generated from Jira on ${today}. Group: ${selectedGroup}.</textarea>
+    <div class="fld"><div class="fld-label">Cases Reopened <button class="copy-btn" onclick="cpRO('${mid}-cr',this)">Copy</button></div>
+      <div class="fld-ro" id="${mid}-cr">${reopenList}</div></div>
+    <div class="fld"><div class="fld-label">Plans for Tomorrow <button class="copy-btn" onclick="cpTA('${mid}-pl',this)">Copy</button></div>
+      <textarea class="fld-ta" id="${mid}-pl" rows="2" placeholder="What is ${m.displayName.split(' ')[0]} planning to work on tomorrow?"></textarea></div>
+    <div class="fld"><div class="fld-label">Additional Comments <button class="copy-btn" onclick="cpTA('${mid}-cm',this)">Copy</button></div>
+      <textarea class="fld-ta" id="${mid}-cm" rows="2">${queue.length} cases currently in QA queue. ${aging.length>0?`${aging.length} aging case(s): ${aging.map(i=>i.key).join(', ')}.`:''} ${overdue.length>0?`${overdue.length} overdue case(s): ${overdue.map(i=>i.key).join(', ')}.`:''} Reopen rate: ${reopenRate}%.</textarea></div>
   </div>`;
 }
 
-function copyMemberAll(mid, name) {
-  const fields = [
-    ['KEY UPDATES', `${mid}-ku`],
-    ['CASES CLOSED/PUSHED', `${mid}-cc`],
-    ['COUNT CLOSED', `${mid}-nc`],
-    ['CASES REOPENED', `${mid}-cr`],
-    ['COUNT REOPENED', `${mid}-nr`],
-    ['PLANS FOR TOMORROW', `${mid}-pl`],
-    ['ADDITIONAL COMMENTS', `${mid}-cm`],
-  ];
-  const text = `=== ${name} ===\n\n` + fields.map(([l,id]) => {
-    const el = document.getElementById(id);
-    return el ? `--- ${l} ---\n${el.value}` : '';
-  }).filter(Boolean).join('\n\n');
-  navigator.clipboard.writeText(text).then(() => alert(`✅ ${name}'s form fields copied to clipboard!`));
+// ── Copy helpers ───────────────────────────────────────────────────
+function cpTA(id,btn){const el=document.getElementById(id);if(!el)return;navigator.clipboard.writeText(el.value).then(()=>flash(btn));}
+function cpRO(id,btn){const el=document.getElementById(id);if(!el)return;navigator.clipboard.writeText(el.innerText).then(()=>flash(btn));}
+function flash(btn){if(!btn)return;const o=btn.innerHTML;btn.innerHTML='✓';btn.classList.add('copied');setTimeout(()=>{btn.innerHTML=o;btn.classList.remove('copied');},1500);}
+function copyAll(mid,name){
+  const ku=document.getElementById(`${mid}-ku`)?.value||'';
+  const cc=document.getElementById(`${mid}-cc`)?.innerText||'';
+  const nc=document.getElementById(`${mid}-nc`)?.innerText||'';
+  const cr=document.getElementById(`${mid}-cr`)?.innerText||'';
+  const nr=document.getElementById(`${mid}-nr`)?.innerText||'';
+  const pl=document.getElementById(`${mid}-pl`)?.value||'';
+  const cm=document.getElementById(`${mid}-cm`)?.value||'';
+  const txt=`=== ${name} ===\n\n--- KEY UPDATES ---\n${ku}\n\n--- CASES PUSHED/CLOSED ---\n${cc}\n\n--- COUNT PUSHED: ${nc} ---\n\n--- CASES REOPENED ---\n${cr}\n\n--- COUNT REOPENED: ${nr} ---\n\n--- PLANS FOR TOMORROW ---\n${pl}\n\n--- ADDITIONAL COMMENTS ---\n${cm}`;
+  navigator.clipboard.writeText(txt).then(()=>showToast(`✅ ${name}'s fields copied!`));
 }
 
-function copyAllSummary() {
-  const today = new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  let text = `QA TEAM DAILY UPDATE — ${today}\nGroup: ${selectedGroup}\n${'='.repeat(60)}\n\n`;
-  Object.entries(teamData).forEach(([uname, d], idx) => {
-    const mid = `m${idx}`;
-    const ku = document.getElementById(`${mid}-ku`)?.value || '';
-    text += ku + '\n\n' + '-'.repeat(40) + '\n\n';
+// ── Leaderboard ────────────────────────────────────────────────────
+function renderLeaderboard() {
+  const card=document.getElementById('lb-card');
+  if(!Object.keys(teamData).length){card.innerHTML='<div class="empty-state">Fetch team data first.</div>';return;}
+  const sorted=[...teamMembers].map(m=>({m,d:teamData[m.name]})).filter(x=>x.d)
+    .sort((a,b)=>(b.d.pushed.length-a.d.pushed.length));
+  const max=Math.max(...sorted.map(x=>x.d.pushed.length),1);
+
+  card.innerHTML=`<div class="card-title">🏆 Today's Leaderboard — Pushed to Customer</div>`+
+  sorted.map(({m,d},i)=>{
+    const rankClass=i===0?'gold':i===1?'silver':i===2?'bronze':'';
+    const pct=Math.round((d.pushed.length/max)*100);
+    const color=avatarColor(m.displayName);
+    return `<div class="lb-row">
+      <div class="lb-rank ${rankClass}">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</div>
+      <div class="avatar" style="background:${color};width:26px;height:26px;font-size:9px">${initials(m.displayName)}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:600;margin-bottom:4px">${m.displayName}</div>
+        <div class="lb-bar-wrap"><div class="lb-bar" style="width:${pct}%;background:${color}"></div></div>
+      </div>
+      <div class="lb-nums">
+        <div style="color:var(--success)">${d.pushed.length} pushed</div>
+        <div style="color:var(--warning);font-size:10px">${d.reopened.length} reopened</div>
+        <div style="color:var(--danger);font-size:10px">${d.reopenRate}% rate</div>
+      </div>
+    </div>`;}).join('');
+}
+
+// ── Weekly Trends ──────────────────────────────────────────────────
+async function fetchTrends() {
+  if(!connectedUser){showToast('Not connected.');return;}
+  if(!teamMembers.length){showToast('No team members.');return;}
+  showSbar('trend-status','Fetching 7-day trends...','loading');
+
+  const dates=[];
+  for(let i=6;i>=0;i--){
+    const d=new Date();
+    d.setDate(d.getDate()-i);
+    dates.push(d.toLocaleDateString('en-CA',{timeZone:'Asia/Kolkata'}));
+  }
+  const labels=dates.map(d=>new Date(d+'T00:00:00').toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'}));
+
+  const teamPushed=new Array(7).fill(0);
+  const teamReopen=new Array(7).fill(0);
+  const memberTrends={};
+
+  for(const m of teamMembers){
+    memberTrends[m.name]={pushed:new Array(7).fill(0),reopen:new Array(7).fill(0)};
+    for(let di=0;di<dates.length;di++){
+      const date=dates[di];
+      try{
+        const r=await jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(buildJql(jqlPushed||DEFAULT_JQL_PUSHED,m.name,date))}&maxResults=100&fields=summary`);
+        memberTrends[m.name].pushed[di]=r.total||0;
+        teamPushed[di]+=r.total||0;
+      }catch(e){}
+      try{
+        const r=await jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(buildJql(jqlReopen||DEFAULT_JQL_REOPEN,m.name,date))}&maxResults=100&fields=summary`);
+        memberTrends[m.name].reopen[di]=r.total||0;
+        teamReopen[di]+=r.total||0;
+      }catch(e){}
+    }
+  }
+
+  // Team chart
+  if(trendChart) trendChart.destroy();
+  const ctx=document.getElementById('trend-chart').getContext('2d');
+  trendChart=new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        {label:'Pushed',data:teamPushed,backgroundColor:'rgba(62,207,142,0.6)',borderColor:'#3ecf8e',borderWidth:1,borderRadius:4},
+        {label:'Reopened',data:teamReopen,backgroundColor:'rgba(245,166,35,0.6)',borderColor:'#f5a623',borderWidth:1,borderRadius:4}
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#e8eaf0',font:{size:11}}}},scales:{x:{ticks:{color:'#6b7080',font:{size:10}},grid:{color:'#2a2d3a'}},y:{ticks:{color:'#6b7080',font:{size:10},stepSize:1},grid:{color:'#2a2d3a'},beginAtZero:true}}}
   });
-  navigator.clipboard.writeText(text).then(() => alert('✅ Full team summary copied to clipboard!'));
+
+  // Per-member charts
+  const mc=document.getElementById('trend-member-charts');
+  mc.innerHTML='<div class="card-title">Per-member breakdown</div>'+
+  teamMembers.map(m=>{
+    const td=memberTrends[m.name];
+    const totalP=td.pushed.reduce((a,b)=>a+b,0);
+    const totalR=td.reopen.reduce((a,b)=>a+b,0);
+    return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+      <div class="avatar" style="background:${avatarColor(m.displayName)};width:28px;height:28px;font-size:10px">${initials(m.displayName)}</div>
+      <div style="flex:1"><div style="font-weight:600;font-size:13px;margin-bottom:4px">${m.displayName}</div>
+        <div style="display:flex;gap:4px">${td.pushed.map((v,i)=>`<div title="${labels[i]}: ${v} pushed" style="flex:1;height:24px;background:rgba(62,207,142,${Math.max(0.1,v/Math.max(...td.pushed,1))});border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-family:var(--mono);color:var(--success)">${v||''}</div>`).join('')}</div>
+      </div>
+      <div style="text-align:right;font-family:var(--mono);font-size:11px;min-width:70px">
+        <div style="color:var(--success)">${totalP} pushed</div>
+        <div style="color:var(--warning)">${totalR} reopen</div>
+      </div>
+    </div>`;}).join('');
+
+  showSbar('trend-status',`✅ 7-day trends loaded for ${teamMembers.length} members.`,'ok');
+}
+
+// ── History ────────────────────────────────────────────────────────
+function saveToHistory(date) {
+  const hist=JSON.parse(localStorage.getItem('qa_history')||'[]');
+  const snapshot={
+    date,
+    timestamp:new Date().toISOString(),
+    members:teamMembers.map(m=>({
+      name:m.name,displayName:m.displayName,
+      pushed:teamData[m.name]?.pushed?.length||0,
+      reopened:teamData[m.name]?.reopened?.length||0,
+      queue:teamData[m.name]?.queue?.length||0,
+      aging:teamData[m.name]?.aging?.length||0,
+      overdue:teamData[m.name]?.overdue?.length||0,
+      reopenRate:teamData[m.name]?.reopenRate||0,
+    }))
+  };
+  // Remove existing entry for same date
+  const filtered=hist.filter(h=>h.date!==date);
+  filtered.unshift(snapshot);
+  // Keep last 30
+  localStorage.setItem('qa_history',JSON.stringify(filtered.slice(0,30)));
+}
+function renderHistoryList() {
+  const hist=JSON.parse(localStorage.getItem('qa_history')||'[]');
+  const el=document.getElementById('history-list');
+  if(!hist.length){el.innerHTML='<div class="empty-state">No history yet. Fetch team data to start recording.</div>';return;}
+  el.innerHTML=hist.map(h=>{
+    const totalP=h.members.reduce((a,m)=>a+m.pushed,0);
+    const totalR=h.members.reduce((a,m)=>a+m.reopened,0);
+    const dateLabel=new Date(h.date+'T00:00:00').toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    return `<div class="hist-item" onclick="showHistoryDetail('${h.date}')">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <div class="hist-date">${dateLabel}</div>
+        <div style="display:flex;gap:8px">
+          <span style="background:rgba(62,207,142,0.1);color:var(--success);border-radius:4px;padding:2px 8px;font-size:10px;font-family:var(--mono)">${totalP} pushed</span>
+          <span style="background:rgba(245,166,35,0.1);color:var(--warning);border-radius:4px;padding:2px 8px;font-size:10px;font-family:var(--mono)">${totalR} reopened</span>
+        </div>
+      </div>
+      <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">
+        ${h.members.map(m=>`<span style="font-size:11px;color:var(--muted)">${m.displayName}: <strong style="color:var(--success)">${m.pushed}↑</strong> <strong style="color:var(--warning)">${m.reopened}↻</strong></span>`).join(' · ')}
+      </div>
+    </div>`;}).join('');
+}
+function showHistoryDetail(date) {
+  const hist=JSON.parse(localStorage.getItem('qa_history')||'[]');
+  const h=hist.find(x=>x.date===date);
+  if(!h) return;
+  const dateLabel=new Date(h.date+'T00:00:00').toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  alert(`${dateLabel}\n\n`+h.members.map(m=>`${m.displayName}\n  Pushed: ${m.pushed} | Reopened: ${m.reopened} | Queue: ${m.queue} | Aging: ${m.aging} | Overdue: ${m.overdue} | Reopen rate: ${m.reopenRate}%`).join('\n\n'));
+}
+function clearHistory() {
+  if(!confirm('Clear all history? This cannot be undone.')) return;
+  localStorage.removeItem('qa_history');
+  renderHistoryList();
+  showToast('History cleared.');
+}
+
+// ── CSV Export ─────────────────────────────────────────────────────
+function exportCSV() {
+  if(!Object.keys(teamData).length){showToast('Fetch data first.');return;}
+  const date=document.getElementById('fetch-date').value;
+  const rows=[['Date','Member','Username','Pushed','Reopened','Queue','Aging','Overdue','Reopen Rate %','Critical','High','Medium','Low']];
+  teamMembers.forEach(m=>{
+    const d=teamData[m.name];
+    if(!d) return;
+    rows.push([date,m.displayName,m.name,d.pushed.length,d.reopened.length,d.queue.length,d.aging.length,d.overdue.length,d.reopenRate,d.priorities.critical,d.priorities.high,d.priorities.medium,d.priorities.low]);
+  });
+  // Add detail rows
+  rows.push([]);
+  rows.push(['--- Pushed Cases ---']);
+  rows.push(['Date','Member','Key','Summary','Status','Priority']);
+  teamMembers.forEach(m=>{
+    const d=teamData[m.name];
+    if(!d) return;
+    d.pushed.forEach(i=>rows.push([date,m.displayName,i.key,`"${(i.fields.summary||'').replace(/"/g,'""')}"`,i.fields.status?.name||'',i.fields.priority?.name||'']));
+  });
+  rows.push([]);
+  rows.push(['--- Reopened Cases ---']);
+  rows.push(['Date','Member','Key','Summary','Status','Priority']);
+  teamMembers.forEach(m=>{
+    const d=teamData[m.name];
+    if(!d) return;
+    d.reopened.forEach(i=>rows.push([date,m.displayName,i.key,`"${(i.fields.summary||'').replace(/"/g,'""')}"`,i.fields.status?.name||'',i.fields.priority?.name||'']));
+  });
+
+  const csv=rows.map(r=>r.join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=`qa-team-update-${date}.csv`; a.click();
+  URL.revokeObjectURL(url);
+  showToast('✅ CSV exported!');
 }
 </script>
 </body>

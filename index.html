@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QA Team Daily Update</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg: #0e0f14;
+    --surface: #16181f;
+    --surface2: #1e2029;
+    --border: #2a2d3a;
+    --accent: #4f8ef7;
+    --accent2: #7c5cbf;
+    --success: #3ecf8e;
+    --warning: #f5a623;
+    --danger: #f05252;
+    --text: #e8eaf0;
+    --muted: #6b7080;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    padding: 24px;
+  }
+
+  .app { max-width: 980px; margin: 0 auto; }
+
+  header {
+    display: flex; align-items: center; gap: 14px;
+    margin-bottom: 28px; padding-bottom: 18px; border-bottom: 1px solid var(--border);
+  }
+  .logo {
+    width: 42px; height: 42px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 10px; display: flex; align-items: center; justify-content: center;
+    font-size: 20px; flex-shrink: 0;
+  }
+  header h1 { font-family: var(--mono); font-size: 17px; font-weight: 700; }
+  header p { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .badge {
+    margin-left: auto; background: rgba(79,142,247,0.12); color: var(--accent);
+    font-family: var(--mono); font-size: 10px; padding: 4px 10px;
+    border-radius: 20px; border: 1px solid rgba(79,142,247,0.3);
+  }
+
+  /* Steps */
+  .steps { display: flex; margin-bottom: 24px; position: relative; }
+  .steps::before {
+    content: ''; position: absolute; top: 16px; left: 16px; right: 16px;
+    height: 1px; background: var(--border); z-index: 0;
+  }
+  .step { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; position: relative; z-index: 1; }
+  .step-dot {
+    width: 32px; height: 32px; border-radius: 50%; background: var(--surface2);
+    border: 1.5px solid var(--border); display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--muted); transition: all 0.3s;
+  }
+  .step.active .step-dot { background: var(--accent); border-color: var(--accent); color: white; box-shadow: 0 0 16px rgba(79,142,247,0.4); }
+  .step.done .step-dot { background: var(--success); border-color: var(--success); color: white; }
+  .step-label { font-size: 10px; color: var(--muted); text-align: center; font-weight: 500; }
+  .step.active .step-label { color: var(--accent); }
+  .step.done .step-label { color: var(--success); }
+
+  /* Cards */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 24px; margin-bottom: 16px; }
+  .card-title {
+    font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--accent);
+    letter-spacing: 1px; text-transform: uppercase; margin-bottom: 18px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .card-title::before { content: ''; display: inline-block; width: 3px; height: 14px; background: var(--accent); border-radius: 2px; }
+
+  .field-group { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .field-group.single { grid-template-columns: 1fr; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  label { font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: 0.4px; text-transform: uppercase; }
+
+  input, textarea, select {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-family: var(--sans); font-size: 13px; padding: 10px 13px;
+    outline: none; transition: border-color 0.2s, box-shadow 0.2s; width: 100%;
+  }
+  input[type="password"] { font-family: var(--mono); letter-spacing: 2px; }
+  input:focus, textarea:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79,142,247,0.12); }
+  textarea { min-height: 70px; resize: vertical; font-size: 12px; }
+  .hint { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px;
+    border-radius: 8px; font-family: var(--sans); font-size: 13px; font-weight: 600;
+    cursor: pointer; border: none; transition: all 0.2s;
+  }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover { background: #3a7de8; transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .btn-secondary { background: var(--surface2); border: 1px solid var(--border); color: var(--text); }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-success { background: var(--success); color: #0e1a12; }
+  .btn-success:hover { background: #35b87c; }
+  .btn-sm { padding: 6px 14px; font-size: 11px; }
+  .actions { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; align-items: center; }
+
+  .status-bar {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 14px; font-family: var(--mono); font-size: 11px; color: var(--muted);
+    margin-top: 14px; min-height: 38px; display: flex; align-items: center; gap: 8px;
+  }
+  .status-bar.loading { color: var(--accent); }
+  .status-bar.success { color: var(--success); border-color: rgba(62,207,142,0.3); }
+  .status-bar.error { color: var(--danger); border-color: rgba(240,82,82,0.3); }
+
+  .spinner { width: 12px; height: 12px; border: 2px solid transparent; border-top-color: currentColor; border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .info-box { background: rgba(79,142,247,0.07); border: 1px solid rgba(79,142,247,0.2); border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #8bb4fa; margin-bottom: 16px; line-height: 1.6; }
+
+  .group-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .group-pill {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 20px;
+    padding: 6px 16px; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.2s;
+  }
+  .group-pill:hover { border-color: var(--accent); color: var(--accent); }
+  .group-pill.selected { background: rgba(79,142,247,0.15); border-color: var(--accent); color: var(--accent); }
+
+  .avatar {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700; color: white; flex-shrink: 0;
+  }
+
+  /* Member tabs */
+  .tab-container { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; margin-bottom: 16px; }
+  .member-tabs-bar { display: flex; overflow-x: auto; border-bottom: 1px solid var(--border); }
+  .member-tabs-bar::-webkit-scrollbar { height: 3px; }
+  .member-tabs-bar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .member-tab {
+    padding: 11px 18px; font-size: 12px; font-weight: 600; color: var(--muted);
+    cursor: pointer; border: none; background: none; border-bottom: 2px solid transparent;
+    white-space: nowrap; transition: all 0.2s; font-family: var(--sans);
+    display: flex; align-items: center; gap: 7px;
+  }
+  .member-tab:hover { color: var(--text); }
+  .member-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-count {
+    background: rgba(79,142,247,0.15); color: var(--accent); font-family: var(--mono);
+    font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 10px;
+  }
+  .member-tab.active .tab-count { background: var(--accent); color: white; }
+  .member-panel { display: none; padding: 20px; }
+  .member-panel.active { display: block; }
+
+  /* Stats */
+  .stats-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin: 14px 0; }
+  .stat-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; text-align: center; }
+  .stat-card .num { font-family: var(--mono); font-size: 22px; font-weight: 700; line-height: 1; margin-bottom: 3px; }
+  .stat-card .lbl { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat-card.blue .num { color: var(--accent); }
+  .stat-card.green .num { color: var(--success); }
+  .stat-card.orange .num { color: var(--warning); }
+  .stat-card.red .num { color: var(--danger); }
+
+  /* Ticket table */
+  .ticket-wrap { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin: 12px 0; }
+  .ticket-wrap table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .ticket-wrap th { background: var(--surface2); padding: 7px 10px; text-align: left; font-family: var(--mono); font-size: 9px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
+  .ticket-wrap td { padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .ticket-wrap tr:last-child td { border-bottom: none; }
+  .ticket-wrap tr:hover td { background: rgba(79,142,247,0.04); }
+  .ticket-key { font-family: var(--mono); font-size: 10px; color: var(--accent); font-weight: 700; white-space: nowrap; }
+  .status-pill { display: inline-block; padding: 2px 7px; border-radius: 20px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap; }
+  .pill-done { background: rgba(62,207,142,0.15); color: var(--success); }
+  .pill-progress { background: rgba(79,142,247,0.15); color: var(--accent); }
+  .pill-reopen { background: rgba(245,166,35,0.15); color: var(--warning); }
+  .pill-todo { background: rgba(107,112,128,0.2); color: var(--muted); }
+
+  /* Form output */
+  .out-field { margin-bottom: 12px; }
+  .out-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; display: flex; align-items: center; justify-content: space-between; }
+  .copy-btn { background: none; border: 1px solid var(--border); color: var(--muted); font-size: 9px; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-family: var(--mono); transition: all 0.2s; }
+  .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+  textarea.out { background: var(--bg); border-color: var(--border); font-family: var(--mono); font-size: 11px; color: var(--text); min-height: 60px; }
+  input.out { background: var(--bg); border-color: var(--border); font-family: var(--mono); font-size: 12px; color: var(--success); font-weight: 700; }
+
+  .member-header { display: flex; align-items: center; gap: 10px; padding-bottom: 14px; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+  .member-name { font-weight: 600; font-size: 14px; }
+  .member-email { font-size: 11px; color: var(--muted); }
+
+  .progress-bar-wrap { margin-top: 12px; }
+  .progress-bar-bg { background: var(--surface2); border-radius: 4px; height: 5px; overflow: hidden; }
+  .progress-bar-fill { height: 5px; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 4px; transition: width 0.4s; }
+  .progress-label { font-size: 10px; color: var(--muted); margin-bottom: 4px; font-family: var(--mono); }
+
+  .section-hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="logo">🧪</div>
+    <div>
+      <h1>QA Team Daily Update</h1>
+      <p>Jira → Per-member form automation</p>
+    </div>
+    <div class="badge">PAT AUTH</div>
+  </header>
+
+  <div class="steps">
+    <div class="step active" id="s1"><div class="step-dot">1</div><div class="step-label">Connect</div></div>
+    <div class="step" id="s2"><div class="step-dot">2</div><div class="step-label">Select Group</div></div>
+    <div class="step" id="s3"><div class="step-dot">3</div><div class="step-label">Fetch Cases</div></div>
+    <div class="step" id="s4"><div class="step-dot">4</div><div class="step-label">Per-Member Forms</div></div>
+  </div>
+
+  <!-- STEP 1: Connect -->
+  <div id="sec-connect" class="card">
+    <div class="card-title">Jira Connection</div>
+    <div class="info-box">🔐 Your PAT authenticates directly with your Jira server. When hosted on GitHub Pages, use the Cloudflare Worker Proxy URL to bypass HTTPS restrictions.</div>
+
+    <div class="field-group single" style="margin-bottom:14px">
+      <div class="field">
+        <label>Cloudflare Worker Proxy URL <span style="color:var(--warning);font-size:9px;text-transform:none;letter-spacing:0">(required for GitHub Pages)</span></label>
+        <input type="text" id="proxyUrl" placeholder="https://jira-proxy.yourname.workers.dev" />
+        <div class="hint">Deploy cloudflare-worker.js → paste your worker URL here. Leave blank if running locally (localhost).</div>
+      </div>
+    </div>
+
+    <div class="field-group single" style="margin-bottom:14px">
+      <div class="field">
+        <label>Jira Base URL <span style="color:var(--muted);font-size:9px;text-transform:none;letter-spacing:0">(used by the worker to reach your server)</span></label>
+        <input type="text" id="jiraUrl" placeholder="http://jdac.unilogcorp.com" />
+        <div class="hint">Your internal Jira server URL — the Worker forwards requests here on your behalf</div>
+      </div>
+    </div>
+
+    <div class="field-group" style="margin-bottom:14px">
+      <div class="field">
+        <label>Personal Access Token (PAT)</label>
+        <input type="password" id="jiraPat" placeholder="Enter your PAT" />
+        <div class="hint">Jira → Profile → Personal Access Tokens</div>
+      </div>
+      <div class="field">
+        <label>Cases Updated From</label>
+        <input type="date" id="dateFrom" />
+        <div class="hint">Default: today. Change to fetch a different day.</div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary" onclick="connect()">🔌 Connect to Jira</button>
+    </div>
+    <div class="status-bar" id="conn-status">Enter your Jira URL and PAT to begin.</div>
+  </div>
+
+  <!-- STEP 2: Select Group -->
+  <div id="sec-group" class="card section-hidden">
+    <div class="card-title">Select Jira Group / Team</div>
+    <div class="info-box" id="connected-as-box"></div>
+    <div class="field">
+      <label>Search Groups</label>
+      <input type="text" id="groupSearch" placeholder="Type to filter groups..." oninput="filterGroups()" />
+    </div>
+    <div class="group-list" id="group-list"><div style="color:var(--muted);font-size:12px;margin-top:8px">Loading groups...</div></div>
+    <div class="actions">
+      <button class="btn btn-primary" id="loadMembersBtn" onclick="loadMembers()" disabled>👥 Load Members</button>
+      <button class="btn btn-secondary" onclick="goTo(1)">← Back</button>
+    </div>
+    <div class="status-bar" id="group-status">Select a group to continue.</div>
+  </div>
+
+  <!-- STEP 3: Fetch Cases -->
+  <div id="sec-fetch" class="card section-hidden">
+    <div class="card-title">Fetch Team Cases</div>
+    <div id="members-preview" style="margin-bottom:16px"></div>
+    <div class="field-group single" style="margin-bottom:14px">
+      <div class="field">
+        <label>Project Keys (optional — leave blank for all projects)</label>
+        <input type="text" id="projectKeys" placeholder="e.g. QA, TEST — leave blank to auto-discover" />
+        <div class="hint">Leave blank to search across all Jira projects automatically</div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary" id="fetchBtn" onclick="fetchTeamCases()">⚡ Fetch All Members' Cases</button>
+      <button class="btn btn-secondary" onclick="goTo(2)">← Back</button>
+    </div>
+    <div class="status-bar" id="fetch-status">Ready to fetch.</div>
+    <div class="progress-bar-wrap section-hidden" id="progress-wrap">
+      <div class="progress-label" id="progress-label">Fetching...</div>
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="progress-fill" style="width:0%"></div></div>
+    </div>
+  </div>
+
+  <!-- STEP 4: Per-member results -->
+  <div id="sec-results" class="section-hidden">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <div style="font-family:var(--mono);font-size:12px;color:var(--muted)">TEAM RESULTS — <span id="result-date"></span></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-secondary btn-sm" onclick="goTo(3)">← Back</button>
+        <button class="btn btn-success btn-sm" onclick="copyAllSummary()">📋 Copy Full Team Summary</button>
+      </div>
+    </div>
+
+    <!-- Team overview -->
+    <div class="card" style="padding:16px;margin-bottom:12px">
+      <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:10px;letter-spacing:1px">TEAM OVERVIEW</div>
+      <div class="stats-row">
+        <div class="stat-card blue"><div class="num" id="team-total">0</div><div class="lbl">Total Cases</div></div>
+        <div class="stat-card green"><div class="num" id="team-closed">0</div><div class="lbl">Closed/Pushed</div></div>
+        <div class="stat-card orange"><div class="num" id="team-reopen">0</div><div class="lbl">Reopened</div></div>
+        <div class="stat-card red"><div class="num" id="team-members">0</div><div class="lbl">Members</div></div>
+      </div>
+    </div>
+
+    <!-- Member tabs -->
+    <div class="tab-container">
+      <div class="member-tabs-bar" id="member-tabs-bar"></div>
+      <div id="member-panels"></div>
+    </div>
+  </div>
+
+</div>
+<script>
+let cfg = {};
+let allGroups = [];
+let selectedGroup = null;
+let teamMembers = [];
+let teamData = {};
+
+document.getElementById('dateFrom').value = new Date().toISOString().split('T')[0];
+
+function setStep(n) {
+  [1,2,3,4].forEach(i => {
+    const el = document.getElementById(`s${i}`);
+    el.className = 'step' + (i < n ? ' done' : i === n ? ' active' : '');
+  });
+}
+function show(id) { document.getElementById(id).classList.remove('section-hidden'); }
+function hide(id) { document.getElementById(id).classList.add('section-hidden'); }
+function showStatus(id, msg, type='') {
+  const el = document.getElementById(id);
+  el.className = 'status-bar ' + type;
+  el.innerHTML = type === 'loading' ? `<div class="spinner"></div> ${msg}` : msg;
+}
+function goTo(step) {
+  ['sec-connect','sec-group','sec-fetch','sec-results'].forEach(id => hide(id));
+  const ids = ['','sec-connect','sec-group','sec-fetch','sec-results'];
+  show(ids[step]);
+  setStep(step);
+}
+function getUrl() {
+  let url = document.getElementById('jiraUrl').value.trim().replace(/\/$/, '');
+  if (url && !url.startsWith('http://') && !url.startsWith('https://')) url = 'http://' + url;
+  return url;
+}
+function getProxy() {
+  return document.getElementById('proxyUrl').value.trim().replace(/\/$/, '');
+}
+// Build the request URL — use proxy if set, otherwise call Jira directly
+function buildReqUrl(path) {
+  const proxy = getProxy();
+  if (proxy) {
+    // Existing worker uses /jira/ prefix: proxy/jira/rest/api/2/...
+    return `${proxy}/jira${path}`;
+  }
+  // Direct mode: local/localhost usage
+  return `${cfg.url}${path}`;
+}
+async function jiraReq(path) {
+  const url = buildReqUrl(path);
+  const resp = await fetch(url, {
+    headers: { 'Authorization': `Bearer ${cfg.pat}`, 'Content-Type': 'application/json', 'Accept': 'application/json' }
+  });
+  if (!resp.ok) { const t = await resp.text(); throw new Error(`Jira ${resp.status}: ${t.slice(0,300)}`); }
+  return resp.json();
+}
+function categorizePill(s) {
+  s = (s||'').toLowerCase();
+  if (s.includes('closed')||s.includes('resolved')||s.includes('done')||s.includes('pushed')) return 'pill-done';
+  if (s.includes('reopen')||s.includes('re-open')) return 'pill-reopen';
+  if (s.includes('progress')) return 'pill-progress';
+  return 'pill-todo';
+}
+function categorize(issues) {
+  return {
+    closed: issues.filter(i => { const s=(i.fields.status?.name||'').toLowerCase(); return s.includes('closed')||s.includes('resolved')||s.includes('done')||s.includes('pushed'); }),
+    reopened: issues.filter(i => { const s=(i.fields.status?.name||'').toLowerCase(); return s.includes('reopen')||s.includes('re-open'); }),
+    inProgress: issues.filter(i => { const s=(i.fields.status?.name||'').toLowerCase(); return s.includes('progress'); }),
+  };
+}
+function initials(name) { return (name||'?').split(/[\s.]+/).filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join(''); }
+function avatarColor(name) {
+  const colors=['#4f8ef7','#7c5cbf','#3ecf8e','#f5a623','#f05252','#06b6d4','#8b5cf6','#ec4899'];
+  let h=0; for(const c of (name||'')) h=(h*31+c.charCodeAt(0))&0xffff;
+  return colors[h%colors.length];
+}
+function copyField(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  navigator.clipboard.writeText(el.value).then(() => {
+    const btn = document.querySelector(`[data-copy="${id}"]`);
+    if (btn) { const o=btn.textContent; btn.textContent='✓'; btn.style.color='var(--success)'; setTimeout(()=>{btn.textContent=o;btn.style.color='';},1500); }
+  });
+}
+
+// ── Step 1: Connect ──
+async function connect() {
+  cfg.url = getUrl();
+  cfg.pat = document.getElementById('jiraPat').value.trim();
+  cfg.dateFrom = document.getElementById('dateFrom').value;
+  cfg.proxy = getProxy();
+  if (!cfg.pat) { showStatus('conn-status','⚠ Enter your PAT.','error'); return; }
+  if (!cfg.proxy && !cfg.url) { showStatus('conn-status','⚠ Enter either a Proxy URL or Jira Base URL.','error'); return; }
+
+  const mode = cfg.proxy ? `via Proxy → ${cfg.proxy}` : `direct → ${cfg.url}`;
+  showStatus('conn-status',`Connecting (${mode})...`,'loading');
+  try {
+    const me = await jiraReq('/rest/api/2/myself');
+    cfg.me = me;
+    showStatus('conn-status',`✅ Connected as: ${me.displayName} (${me.emailAddress||me.name}) [${cfg.proxy ? 'Proxy mode' : 'Direct mode'}]`,'success');
+    document.getElementById('connected-as-box').textContent = `✅ Connected as ${me.displayName} — select the Jira group that contains your QA team members.`;
+    goTo(2);
+    loadGroups();
+  } catch(e) { showStatus('conn-status',`❌ ${e.message}`,'error'); }
+}
+
+// ── Step 2: Groups ──
+async function loadGroups() {
+  showStatus('group-status','Loading groups...','loading');
+  try {
+    const data = await jiraReq('/rest/api/2/groups/picker?maxResults=200');
+    allGroups = data.groups || [];
+    renderGroups(allGroups);
+    showStatus('group-status',`Found ${allGroups.length} groups. Select one to load members.`,'success');
+  } catch(e) { showStatus('group-status',`❌ ${e.message}`,'error'); }
+}
+function renderGroups(groups) {
+  const c = document.getElementById('group-list');
+  if (!groups.length) { c.innerHTML='<div style="color:var(--muted);font-size:12px;margin-top:8px">No groups found.</div>'; return; }
+  c.innerHTML = groups.map(g=>`<div class="group-pill ${selectedGroup===g.name?'selected':''}" onclick="selectGroup('${g.name.replace(/'/g,"\\'")}',this)">👥 ${g.name}</div>`).join('');
+}
+function filterGroups() {
+  const q = document.getElementById('groupSearch').value.toLowerCase();
+  renderGroups(allGroups.filter(g=>g.name.toLowerCase().includes(q)));
+}
+function selectGroup(name, el) {
+  selectedGroup = name;
+  document.querySelectorAll('.group-pill').forEach(p=>p.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('loadMembersBtn').disabled = false;
+  showStatus('group-status',`Selected: "${name}" — click Load Members.`,'success');
+}
+async function loadMembers() {
+  if (!selectedGroup) return;
+  showStatus('group-status',`Loading members of "${selectedGroup}"...`,'loading');
+  try {
+    const data = await jiraReq(`/rest/api/2/group/member?groupname=${encodeURIComponent(selectedGroup)}&maxResults=100`);
+    teamMembers = (data.values||[]).filter(m=>m.active!==false);
+    if (!teamMembers.length) throw new Error('No active members found in this group.');
+
+    // Preview
+    const preview = document.getElementById('members-preview');
+    preview.innerHTML = `
+      <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:8px;letter-spacing:1px">${teamMembers.length} MEMBERS IN "${selectedGroup}"</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        ${teamMembers.map(m=>`
+          <div style="display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:4px 12px 4px 8px">
+            <div class="avatar" style="background:${avatarColor(m.displayName)};width:20px;height:20px;font-size:8px">${initials(m.displayName)}</div>
+            <span style="font-size:12px">${m.displayName}</span>
+          </div>`).join('')}
+      </div>`;
+
+    showStatus('group-status',`✅ ${teamMembers.length} members loaded.`,'success');
+    goTo(3);
+  } catch(e) { showStatus('group-status',`❌ ${e.message}`,'error'); }
+}
+
+// ── Step 3: Fetch ──
+async function fetchTeamCases() {
+  if (!teamMembers.length) return;
+  const fetchBtn = document.getElementById('fetchBtn');
+  fetchBtn.disabled = true;
+  teamData = {};
+  show('progress-wrap');
+  const fill = document.getElementById('progress-fill');
+  const lbl = document.getElementById('progress-label');
+
+  try {
+    let projectKeys = document.getElementById('projectKeys').value.split(',').map(s=>s.trim()).filter(Boolean);
+    if (!projectKeys.length) {
+      showStatus('fetch-status','Discovering all projects...','loading');
+      const pd = await jiraReq('/rest/api/2/project');
+      projectKeys = (pd||[]).map(p=>p.key);
+      showStatus('fetch-status',`Found ${projectKeys.length} projects. Fetching per member...`,'loading');
+    }
+
+    const projectJql = projectKeys.map(p=>`project="${p}"`).join(' OR ');
+    const dateJql = cfg.dateFrom ? ` AND updatedDate >= "${cfg.dateFrom}"` : '';
+
+    for (let i=0; i<teamMembers.length; i++) {
+      const member = teamMembers[i];
+      fill.style.width = Math.round((i/teamMembers.length)*100)+'%';
+      lbl.textContent = `Fetching: ${member.displayName} (${i+1}/${teamMembers.length})`;
+      showStatus('fetch-status',`Fetching cases for ${member.displayName}...`,'loading');
+
+      const uname = member.name || member.key;
+      const userClause = `(assignee="${uname}" OR reporter="${uname}")`;
+      const jql = encodeURIComponent(`(${projectJql}) AND ${userClause}${dateJql} ORDER BY updated DESC`);
+
+      let issues = [];
+      try {
+        const d = await jiraReq(`/rest/api/2/search?jql=${jql}&maxResults=200&fields=summary,status,updated,assignee,reporter,priority,project`);
+        issues = d.issues || [];
+      } catch(e) { console.warn(`Skipped ${member.displayName}:`, e.message); }
+
+      teamData[uname] = { member, issues, ...categorize(issues) };
+    }
+
+    fill.style.width = '100%';
+    lbl.textContent = `Done! Fetched cases for ${teamMembers.length} members.`;
+    showStatus('fetch-status',`✅ Complete — fetched cases for all ${teamMembers.length} members.`,'success');
+
+    renderResults();
+    goTo(4);
+  } catch(e) {
+    showStatus('fetch-status',`❌ ${e.message}`,'error');
+  } finally {
+    fetchBtn.disabled = false;
+  }
+}
+
+// ── Step 4: Render tabs ──
+function renderResults() {
+  const today = new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('result-date').textContent = today;
+
+  const allIssues = Object.values(teamData).flatMap(d=>d.issues);
+  const allClosed = Object.values(teamData).flatMap(d=>d.closed);
+  const allReopen = Object.values(teamData).flatMap(d=>d.reopened);
+  document.getElementById('team-total').textContent = allIssues.length;
+  document.getElementById('team-closed').textContent = allClosed.length;
+  document.getElementById('team-reopen').textContent = allReopen.length;
+  document.getElementById('team-members').textContent = teamMembers.length;
+
+  const tabsBar = document.getElementById('member-tabs-bar');
+  const panels = document.getElementById('member-panels');
+  tabsBar.innerHTML = '';
+  panels.innerHTML = '';
+
+  Object.entries(teamData).forEach(([uname, d], idx) => {
+    const color = avatarColor(d.member.displayName);
+    // Tab
+    const tab = document.createElement('button');
+    tab.className = 'member-tab' + (idx===0?' active':'');
+    tab.onclick = () => {
+      document.querySelectorAll('.member-tab').forEach((t,i)=>t.classList.toggle('active',i===idx));
+      document.querySelectorAll('.member-panel').forEach((p,i)=>p.classList.toggle('active',i===idx));
+    };
+    tab.innerHTML = `<div class="avatar" style="background:${color};width:18px;height:18px;font-size:8px">${initials(d.member.displayName)}</div>${d.member.displayName.split(' ')[0]}<span class="tab-count">${d.issues.length}</span>`;
+    tabsBar.appendChild(tab);
+
+    // Panel
+    const panel = document.createElement('div');
+    panel.className = 'member-panel' + (idx===0?' active':'');
+    panel.innerHTML = buildPanel(uname, d, idx, today);
+    panels.appendChild(panel);
+  });
+}
+
+function buildPanel(uname, d, idx, today) {
+  const { member, issues, closed, reopened, inProgress } = d;
+  const color = avatarColor(member.displayName);
+  const mid = `m${idx}`;
+
+  const keyUpdates = `QA Daily Update — ${today}\nMember: ${member.displayName} (${member.emailAddress||member.name})\n\nTotal cases: ${issues.length}\nClosed/Pushed: ${closed.length}\nReopened: ${reopened.length}\nIn Progress: ${inProgress.length}`;
+
+  const closedList = closed.length
+    ? closed.map(i=>`• ${i.key} — ${i.fields.summary}`).join('\n')
+    : 'No cases closed/pushed today.';
+
+  const reopenList = reopened.length
+    ? reopened.map(i=>`• ${i.key} — ${i.fields.summary}`).join('\n')
+    : 'No cases reopened today.';
+
+  const plansList = inProgress.length
+    ? `Continue working on:\n${inProgress.slice(0,5).map(i=>`• ${i.key} — ${i.fields.summary}`).join('\n')}`
+    : 'Continue with assigned QA tasks.';
+
+  const rows = issues.map(i => {
+    const upd = i.fields.updated ? new Date(i.fields.updated).toLocaleDateString('en-IN',{day:'2-digit',month:'short'}) : '-';
+    return `<tr>
+      <td><span class="ticket-key">${i.key}</span></td>
+      <td style="color:var(--muted);font-size:10px;white-space:nowrap">${i.fields.project?.key||''}</td>
+      <td style="max-width:260px;font-size:11px;color:var(--text)">${i.fields.summary||''}</td>
+      <td><span class="status-pill ${categorizePill(i.fields.status?.name)}">${i.fields.status?.name||''}</span></td>
+      <td style="color:var(--muted);font-size:10px;white-space:nowrap">${upd}</td>
+    </tr>`;
+  }).join('');
+
+  return `
+  <div class="member-header">
+    <div class="avatar" style="background:${color};width:38px;height:38px;font-size:14px;border-radius:50%">${initials(member.displayName)}</div>
+    <div>
+      <div class="member-name">${member.displayName}</div>
+      <div class="member-email">${member.emailAddress||member.name}</div>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">
+      <span style="background:rgba(79,142,247,0.1);color:var(--accent);border-radius:4px;padding:3px 8px;font-size:10px;font-family:var(--mono)">${issues.length} total</span>
+      <span style="background:rgba(62,207,142,0.1);color:var(--success);border-radius:4px;padding:3px 8px;font-size:10px;font-family:var(--mono)">${closed.length} closed</span>
+      <span style="background:rgba(245,166,35,0.1);color:var(--warning);border-radius:4px;padding:3px 8px;font-size:10px;font-family:var(--mono)">${reopened.length} reopened</span>
+    </div>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-card blue"><div class="num">${issues.length}</div><div class="lbl">Total</div></div>
+    <div class="stat-card green"><div class="num">${closed.length}</div><div class="lbl">Closed</div></div>
+    <div class="stat-card orange"><div class="num">${reopened.length}</div><div class="lbl">Reopened</div></div>
+    <div class="stat-card red"><div class="num">${inProgress.length}</div><div class="lbl">In Progress</div></div>
+  </div>
+
+  ${issues.length ? `
+  <div class="ticket-wrap">
+    <table>
+      <thead><tr><th>Key</th><th>Project</th><th>Summary</th><th>Status</th><th>Updated</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>` : `<div style="color:var(--muted);font-size:12px;padding:10px 0">No cases found for this member on the selected date.</div>`}
+
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-top:18px;margin-bottom:12px">
+    <div style="font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:1px">📋 TEAMS FORM — ${member.displayName.split(' ')[0].toUpperCase()}</div>
+    <button class="btn btn-success btn-sm" onclick="copyMemberAll('${mid}','${member.displayName.replace(/'/g,"\\'")}')">Copy All Fields</button>
+  </div>
+
+  <div class="out-field">
+    <div class="out-label">Key Updates <button class="copy-btn" data-copy="${mid}-ku" onclick="copyField('${mid}-ku')">Copy</button></div>
+    <textarea class="out" id="${mid}-ku" readonly>${keyUpdates}</textarea>
+  </div>
+  <div class="out-field">
+    <div class="out-label">Cases Pushed to Customer or Closed <button class="copy-btn" data-copy="${mid}-cc" onclick="copyField('${mid}-cc')">Copy</button></div>
+    <textarea class="out" id="${mid}-cc" readonly>${closedList}</textarea>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+    <div class="out-field" style="margin-bottom:0">
+      <div class="out-label">Count — Closed <button class="copy-btn" data-copy="${mid}-nc" onclick="copyField('${mid}-nc')">Copy</button></div>
+      <input class="out" id="${mid}-nc" type="text" readonly value="${closed.length}" />
+    </div>
+    <div class="out-field" style="margin-bottom:0">
+      <div class="out-label">Count — Reopened <button class="copy-btn" data-copy="${mid}-nr" onclick="copyField('${mid}-nr')">Copy</button></div>
+      <input class="out" id="${mid}-nr" type="text" readonly value="${reopened.length}" />
+    </div>
+  </div>
+  <div class="out-field">
+    <div class="out-label">Cases Reopened <button class="copy-btn" data-copy="${mid}-cr" onclick="copyField('${mid}-cr')">Copy</button></div>
+    <textarea class="out" id="${mid}-cr" readonly>${reopenList}</textarea>
+  </div>
+  <div class="out-field">
+    <div class="out-label">Plans for Tomorrow <button class="copy-btn" data-copy="${mid}-pl" onclick="copyField('${mid}-pl')">Copy</button></div>
+    <textarea class="out" id="${mid}-pl" readonly>${plansList}</textarea>
+  </div>
+  <div class="out-field">
+    <div class="out-label">Additional Comments <button class="copy-btn" data-copy="${mid}-cm" onclick="copyField('${mid}-cm')">Copy</button></div>
+    <textarea class="out" id="${mid}-cm" readonly>Auto-generated from Jira on ${today}. Group: ${selectedGroup}.</textarea>
+  </div>`;
+}
+
+function copyMemberAll(mid, name) {
+  const fields = [
+    ['KEY UPDATES', `${mid}-ku`],
+    ['CASES CLOSED/PUSHED', `${mid}-cc`],
+    ['COUNT CLOSED', `${mid}-nc`],
+    ['CASES REOPENED', `${mid}-cr`],
+    ['COUNT REOPENED', `${mid}-nr`],
+    ['PLANS FOR TOMORROW', `${mid}-pl`],
+    ['ADDITIONAL COMMENTS', `${mid}-cm`],
+  ];
+  const text = `=== ${name} ===\n\n` + fields.map(([l,id]) => {
+    const el = document.getElementById(id);
+    return el ? `--- ${l} ---\n${el.value}` : '';
+  }).filter(Boolean).join('\n\n');
+  navigator.clipboard.writeText(text).then(() => alert(`✅ ${name}'s form fields copied to clipboard!`));
+}
+
+function copyAllSummary() {
+  const today = new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  let text = `QA TEAM DAILY UPDATE — ${today}\nGroup: ${selectedGroup}\n${'='.repeat(60)}\n\n`;
+  Object.entries(teamData).forEach(([uname, d], idx) => {
+    const mid = `m${idx}`;
+    const ku = document.getElementById(`${mid}-ku`)?.value || '';
+    text += ku + '\n\n' + '-'.repeat(40) + '\n\n';
+  });
+  navigator.clipboard.writeText(text).then(() => alert('✅ Full team summary copied to clipboard!'));
+}
+</script>
+</body>
+</html>

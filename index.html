@@ -217,7 +217,7 @@
 
   <div class="steps">
     <div class="step active" id="s1"><div class="step-dot">1</div><div class="step-label">Connect</div></div>
-    <div class="step" id="s2"><div class="step-dot">2</div><div class="step-label">Select Group</div></div>
+    <div class="step" id="s2"><div class="step-dot">2</div><div class="step-label">Add Members</div></div>
     <div class="step" id="s3"><div class="step-dot">3</div><div class="step-label">Fetch Cases</div></div>
     <div class="step" id="s4"><div class="step-dot">4</div><div class="step-label">Per-Member Forms</div></div>
   </div>
@@ -261,20 +261,36 @@
     <div class="status-bar" id="conn-status">Enter your Jira URL and PAT to begin.</div>
   </div>
 
-  <!-- STEP 2: Select Group -->
+  <!-- STEP 2: Add Members Manually -->
   <div id="sec-group" class="card section-hidden">
-    <div class="card-title">Select Jira Group / Team</div>
+    <div class="card-title">Add Team Members</div>
     <div class="info-box" id="connected-as-box"></div>
-    <div class="field">
-      <label>Search Groups</label>
-      <input type="text" id="groupSearch" placeholder="Type to filter groups..." oninput="filterGroups()" />
+
+    <div class="field-group single" style="margin-bottom:14px">
+      <div class="field">
+        <label>Team Name (optional)</label>
+        <input type="text" id="teamName" placeholder="e.g. QA Services, QA Team" />
+        <div class="hint">Used as a label in the summary — can be anything</div>
+      </div>
     </div>
-    <div class="group-list" id="group-list"><div style="color:var(--muted);font-size:12px;margin-top:8px">Loading groups...</div></div>
+
+    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;margin-bottom:10px">ADD MEMBERS</div>
+
+    <div style="display:flex;gap:10px;margin-bottom:12px">
+      <input type="text" id="memberUsername" placeholder="Jira username (e.g. john.doe)" style="flex:1" />
+      <input type="text" id="memberDisplay" placeholder="Display name (e.g. John Doe)" style="flex:1" />
+      <button class="btn btn-primary btn-sm" onclick="addMember()" style="white-space:nowrap">+ Add</button>
+    </div>
+
+    <div id="members-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+      <div style="color:var(--muted);font-size:12px" id="no-members-hint">No members added yet. Add at least one member above.</div>
+    </div>
+
     <div class="actions">
-      <button class="btn btn-primary" id="loadMembersBtn" onclick="loadMembers()" disabled>👥 Load Members</button>
+      <button class="btn btn-primary" id="confirmMembersBtn" onclick="confirmMembers()" disabled>👥 Confirm Team & Continue</button>
       <button class="btn btn-secondary" onclick="goTo(1)">← Back</button>
     </div>
-    <div class="status-bar" id="group-status">Select a group to continue.</div>
+    <div class="status-bar" id="group-status">Add your team members to continue.</div>
   </div>
 
   <!-- STEP 3: Fetch Cases -->
@@ -330,7 +346,6 @@
 </div>
 <script>
 let cfg = {};
-let allGroups = [];
 let selectedGroup = null;
 let teamMembers = [];
 let teamData = {};
@@ -426,61 +441,85 @@ async function connect() {
     const me = await jiraReq('/rest/api/2/myself');
     cfg.me = me;
     showStatus('conn-status',`✅ Connected as: ${me.displayName} (${me.emailAddress||me.name}) [${cfg.proxy ? 'Proxy mode' : 'Direct mode'}]`,'success');
-    document.getElementById('connected-as-box').textContent = `✅ Connected as ${me.displayName} — select the Jira group that contains your QA team members.`;
+    document.getElementById('connected-as-box').textContent = `✅ Connected as ${me.displayName} — add your QA team members below.`;
     goTo(2);
-    loadGroups();
   } catch(e) { showStatus('conn-status',`❌ ${e.message}`,'error'); }
 }
 
-// ── Step 2: Groups ──
-async function loadGroups() {
-  showStatus('group-status','Loading groups...','loading');
-  try {
-    const data = await jiraReq('/rest/api/2/groups/picker?maxResults=200');
-    allGroups = data.groups || [];
-    renderGroups(allGroups);
-    showStatus('group-status',`Found ${allGroups.length} groups. Select one to load members.`,'success');
-  } catch(e) { showStatus('group-status',`❌ ${e.message}`,'error'); }
-}
-function renderGroups(groups) {
-  const c = document.getElementById('group-list');
-  if (!groups.length) { c.innerHTML='<div style="color:var(--muted);font-size:12px;margin-top:8px">No groups found.</div>'; return; }
-  c.innerHTML = groups.map(g=>`<div class="group-pill ${selectedGroup===g.name?'selected':''}" onclick="selectGroup('${g.name.replace(/'/g,"\\'")}',this)">👥 ${g.name}</div>`).join('');
-}
-function filterGroups() {
-  const q = document.getElementById('groupSearch').value.toLowerCase();
-  renderGroups(allGroups.filter(g=>g.name.toLowerCase().includes(q)));
-}
-function selectGroup(name, el) {
-  selectedGroup = name;
-  document.querySelectorAll('.group-pill').forEach(p=>p.classList.remove('selected'));
-  el.classList.add('selected');
-  document.getElementById('loadMembersBtn').disabled = false;
-  showStatus('group-status',`Selected: "${name}" — click Load Members.`,'success');
-}
-async function loadMembers() {
-  if (!selectedGroup) return;
-  showStatus('group-status',`Loading members of "${selectedGroup}"...`,'loading');
-  try {
-    const data = await jiraReq(`/rest/api/2/group/member?groupname=${encodeURIComponent(selectedGroup)}&maxResults=100`);
-    teamMembers = (data.values||[]).filter(m=>m.active!==false);
-    if (!teamMembers.length) throw new Error('No active members found in this group.');
+// ── Step 2: Manual member entry ──
+function addMember() {
+  const usernameEl = document.getElementById('memberUsername');
+  const displayEl = document.getElementById('memberDisplay');
+  const username = usernameEl.value.trim();
+  const displayName = displayEl.value.trim() || username;
 
-    // Preview
-    const preview = document.getElementById('members-preview');
-    preview.innerHTML = `
-      <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:8px;letter-spacing:1px">${teamMembers.length} MEMBERS IN "${selectedGroup}"</div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px">
-        ${teamMembers.map(m=>`
-          <div style="display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:4px 12px 4px 8px">
-            <div class="avatar" style="background:${avatarColor(m.displayName)};width:20px;height:20px;font-size:8px">${initials(m.displayName)}</div>
-            <span style="font-size:12px">${m.displayName}</span>
-          </div>`).join('')}
-      </div>`;
+  if (!username) { showStatus('group-status','⚠ Enter a Jira username.','error'); return; }
 
-    showStatus('group-status',`✅ ${teamMembers.length} members loaded.`,'success');
-    goTo(3);
-  } catch(e) { showStatus('group-status',`❌ ${e.message}`,'error'); }
+  // Check duplicate
+  if (teamMembers.find(m => m.name === username)) {
+    showStatus('group-status',`⚠ "${username}" is already added.`,'error');
+    return;
+  }
+
+  teamMembers.push({ name: username, displayName, emailAddress: '' });
+  usernameEl.value = '';
+  displayEl.value = '';
+  usernameEl.focus();
+  renderMemberList();
+  document.getElementById('confirmMembersBtn').disabled = false;
+  showStatus('group-status', `✅ ${teamMembers.length} member(s) added.`, 'success');
+}
+
+// Allow pressing Enter to add member
+document.addEventListener('DOMContentLoaded', () => {
+  ['memberUsername','memberDisplay'].forEach(id => {
+    document.getElementById(id)?.addEventListener('keydown', e => { if (e.key === 'Enter') addMember(); });
+  });
+});
+
+function removeMember(username) {
+  teamMembers = teamMembers.filter(m => m.name !== username);
+  renderMemberList();
+  if (!teamMembers.length) document.getElementById('confirmMembersBtn').disabled = true;
+  showStatus('group-status', teamMembers.length ? `✅ ${teamMembers.length} member(s).` : 'Add at least one member to continue.', teamMembers.length ? 'success' : '');
+}
+
+function renderMemberList() {
+  const list = document.getElementById('members-list');
+  const hint = document.getElementById('no-members-hint');
+  if (!teamMembers.length) {
+    list.innerHTML = '';
+    if (hint) hint.style.display = 'block';
+    return;
+  }
+  if (hint) hint.style.display = 'none';
+  list.innerHTML = teamMembers.map(m => `
+    <div style="display:flex;align-items:center;gap:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px">
+      <div class="avatar" style="background:${avatarColor(m.displayName)};width:28px;height:28px;font-size:10px">${initials(m.displayName)}</div>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:600">${m.displayName}</div>
+        <div style="font-size:10px;color:var(--muted);font-family:var(--mono)">${m.name}</div>
+      </div>
+      <button onclick="removeMember('${m.name}')" style="background:none;border:1px solid var(--border);color:var(--danger);border-radius:6px;padding:3px 10px;cursor:pointer;font-size:11px">✕ Remove</button>
+    </div>`).join('');
+}
+
+function confirmMembers() {
+  if (!teamMembers.length) { showStatus('group-status','⚠ Add at least one member.','error'); return; }
+  selectedGroup = document.getElementById('teamName').value.trim() || 'QA Team';
+
+  // Build preview for Step 3
+  const preview = document.getElementById('members-preview');
+  preview.innerHTML = `
+    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:8px;letter-spacing:1px">${teamMembers.length} MEMBERS — ${selectedGroup}</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">
+      ${teamMembers.map(m=>`
+        <div style="display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:4px 12px 4px 8px">
+          <div class="avatar" style="background:${avatarColor(m.displayName)};width:20px;height:20px;font-size:8px">${initials(m.displayName)}</div>
+          <span style="font-size:12px">${m.displayName}</span>
+        </div>`).join('')}
+    </div>`;
+  goTo(3);
 }
 
 // ── Step 3: Fetch ──

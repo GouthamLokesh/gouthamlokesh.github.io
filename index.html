@@ -445,7 +445,7 @@ input[type="date"]:focus{border-color:var(--accent)}
 
 const DEFAULT_JQL_SENT_BACK = `(status CHANGED FROM "QA STAGE" TO "DEV STAGE" BY currentUser() AFTER startOfDay() OR status CHANGED FROM "QA PRODUCTION" TO "DEV PRODUCTION" BY currentUser() AFTER startOfDay()) ORDER BY updated DESC`;
 
-const DEFAULT_JQL_PUSHED = `(status CHANGED FROM "QA STAGE" TO "COMPLETE" BY currentUser() AFTER startOfDay() OR status CHANGED FROM "QA PRODUCTION" TO "COMPLETE" BY currentUser() AFTER startOfDay() OR status CHANGED FROM "APPROVAL STAGE" TO "COMPLETE" BY currentUser() AFTER startOfDay() OR status CHANGED FROM "APPROVAL PRODUCTION" TO "COMPLETE" BY currentUser() AFTER startOfDay()) AND status = "COMPLETE" ORDER BY updated DESC`;
+const DEFAULT_JQL_PUSHED = `(status CHANGED FROM "QA STAGE" TO "COMPLETE" BY currentUser() AFTER startOfDay() OR status CHANGED FROM "QA PRODUCTION" TO "COMPLETE" BY currentUser() AFTER startOfDay() OR status CHANGED FROM "APPROVAL STAGE" TO "COMPLETE" BY currentUser() AFTER startOfDay() OR status CHANGED FROM "APPROVAL PRODUCTION" TO "COMPLETE" BY currentUser() AFTER startOfDay()) ORDER BY updated DESC`;
 
 const DEFAULT_JQL_CUSTOMER = `(status CHANGED FROM "QA STAGE" TO "APPROVAL STAGE" BY currentUser() AFTER startOfDay() OR status CHANGED FROM "QA PRODUCTION" TO "APPROVAL PRODUCTION" BY currentUser() AFTER startOfDay()) AND status in ("APPROVAL STAGE","APPROVAL PRODUCTION") ORDER BY updated DESC`;
 

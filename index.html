@@ -421,6 +421,9 @@ input[type="date"]:focus{border-color:var(--accent)}
 
 <script>
 // ── Constants ──────────────────────────────────────────────────────
+// DEFAULT JQL uses DATE_PLACEHOLDER which gets replaced per-fetch
+// For today: AFTER startOfDay()
+// For past date: ON "yyyy-MM-dd"  (Jira Server supports ON for status CHANGED)
 const DEFAULT_JQL_REOPEN = `(status CHANGED FROM "QA STAGE" TO ("DEV STAGE","DEV QUEUE","BACKLOG") BY currentUser() AFTER startOfDay() OR status CHANGED FROM "QA PRODUCTION" TO ("DEV PRODUCTION","DEV STAGE") BY currentUser() AFTER startOfDay()) ORDER BY updated DESC`;
 const DEFAULT_JQL_PUSHED = `(status CHANGED FROM "QA STAGE" TO "APPROVAL STAGE" BY currentUser() AFTER startOfDay() OR status CHANGED FROM "QA PRODUCTION" TO "APPROVAL PRODUCTION" BY currentUser() AFTER startOfDay()) ORDER BY updated DESC`;
 const DEFAULT_JQL_QUEUE  = `assignee = currentUser() AND status in ("QA STAGE","QA PRODUCTION") ORDER BY priority DESC, updated ASC`;
@@ -480,21 +483,21 @@ async function jiraReq(path) {
   return r.json();
 }
 function buildJql(template, username, date) {
+  // Step 1: replace currentUser() with actual username
   let jql = template.replace(/currentUser\(\)/g, `"${username}"`);
+
   const today = getISTToday();
 
   if (date && date !== today) {
-    // For a custom date, replace "AFTER startOfDay()" with a specific day range
-    // This ensures we get only that day's status changes, not today's
-    // Jira Server: "status CHANGED ... AFTER startOfDay()" → "status CHANGED ... AFTER \"date\" BEFORE \"date+1\""
-    const nextDay = new Date(date + 'T00:00:00');
-    nextDay.setDate(nextDay.getDate() + 1);
-    const nextDateStr = nextDay.toLocaleDateString('en-CA');  // yyyy-MM-dd
-
-    jql = jql.replace(/AFTER startOfDay\(\)/g, `AFTER "${date}" BEFORE "${nextDateStr}"`);
-    jql = jql.replace(/startOfDay\(\)/g, `"${date}"`);
+    // Past date: replace "AFTER startOfDay()" with "ON \"date\""
+    // Jira Server "status CHANGED ... ON \"date\"" returns changes that happened on that exact date
+    jql = jql.replace(/AFTER\s+startOfDay\(\)/gi, `ON "${date}"`);
+    // Catch any remaining startOfDay() references
+    jql = jql.replace(/startOfDay\(\)/gi, `"${date}"`);
   }
 
+  // Log so you can verify in browser console (F12 → Console)
+  console.log(`[JQL] ${username} | ${date} |\n${jql}\n`);
   return jql;
 }
 
@@ -679,8 +682,7 @@ async function fetchAll() {
       const r=await jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(buildJql(jqlPushed||DEFAULT_JQL_PUSHED,m.name,date))}&maxResults=100&fields=summary,status,updated,priority,duedate,project`);
       pushed=r.issues||[];
     } catch(e){console.warn('pushed',m.name,e.message);}
-    // For queue: on a custom date, fetch cases that were in QA on that date
-    // We use updatedDate filter to scope to that day
+    // Queue JQL: for past date scope to cases updated on that specific day
     const queueTemplate = jqlQueue || DEFAULT_JQL_QUEUE;
     let queueJql = queueTemplate.replace(/currentUser\(\)/g, `"${m.name}"`);
     if (date !== getISTToday()) {
@@ -689,6 +691,7 @@ async function fetchAll() {
       const nextDateStr = nextDay.toLocaleDateString('en-CA');
       queueJql = queueJql.replace('ORDER BY', `AND updatedDate >= "${date}" AND updatedDate < "${nextDateStr}" ORDER BY`);
     }
+    console.log(`[QUEUE JQL] ${m.name} | ${date} |\n${queueJql}\n`);
     try {
       const r=await jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(queueJql)}&maxResults=100&fields=summary,status,updated,priority,duedate,project`);
       queue=r.issues||[];

@@ -380,17 +380,28 @@ input[type="date"]:focus{border-color:var(--accent)}
       <div class="s-title">JQL Queries</div>
       <div class="info-box"><code>BY currentUser()</code> is automatically replaced with each member's username when fetching.</div>
       <div class="s-field">
-        <label class="s-label">Reopened cases</label>
-        <textarea class="s-input s-jql" id="s-jql-reopen" rows="3"></textarea>
+        <label class="s-label">Sent Back to Dev (QA Stage → Dev Stage, QA Production → Dev Production)</label>
+        <textarea class="s-input s-jql" id="s-jql-sentback" rows="3"></textarea>
       </div>
       <div class="s-field">
-        <label class="s-label">Pushed to customer</label>
+        <label class="s-label">Closed Cases (QA Stage → Complete, QA Production → Complete, Approval Stage → Complete, Approval Production → Complete)</label>
         <textarea class="s-input s-jql" id="s-jql-pushed" rows="3"></textarea>
       </div>
       <div class="s-field">
-        <label class="s-label">Currently in QA queue</label>
-        <textarea class="s-input s-jql" id="s-jql-queue" rows="2"></textarea>
-        <div class="s-hint">Cases currently assigned and open in QA stage — shows workload.</div>
+        <label class="s-label">Cases Moved to Customer (QA Stage → Approval Stage, QA Production → Approval Production)</label>
+        <textarea class="s-input s-jql" id="s-jql-customer" rows="2"></textarea>
+      </div>
+      <div class="s-field">
+        <label class="s-label">QA Backlog (status = "QA Queue" — cases waiting to be picked up)</label>
+        <textarea class="s-input s-jql" id="s-jql-backlog" rows="2"></textarea>
+      </div>
+      <div class="s-field">
+        <label class="s-label">QA Stage (cases actively being worked on)</label>
+        <textarea class="s-input s-jql" id="s-jql-qastage" rows="2"></textarea>
+      </div>
+      <div class="s-field">
+        <label class="s-label">QA Production (cases in production testing)</label>
+        <textarea class="s-input s-jql" id="s-jql-qaprod" rows="2"></textarea>
       </div>
       <div class="s-field">
         <label class="s-label">Aging threshold (days)</label>
@@ -421,17 +432,36 @@ input[type="date"]:focus{border-color:var(--accent)}
 
 <script>
 // ── Constants ──────────────────────────────────────────────────────
-// DEFAULT JQL uses DATE_PLACEHOLDER which gets replaced per-fetch
-// For today: AFTER startOfDay()
-// For past date: ON "yyyy-MM-dd"  (Jira Server supports ON for status CHANGED)
-const DEFAULT_JQL_REOPEN = `(status CHANGED FROM "QA STAGE" TO ("DEV STAGE","DEV QUEUE","BACKLOG") BY currentUser() AFTER startOfDay() OR status CHANGED FROM "QA PRODUCTION" TO ("DEV PRODUCTION","DEV STAGE") BY currentUser() AFTER startOfDay()) ORDER BY updated DESC`;
-const DEFAULT_JQL_PUSHED = `(status CHANGED FROM "QA STAGE" TO "APPROVAL STAGE" BY currentUser() AFTER startOfDay() OR status CHANGED FROM "QA PRODUCTION" TO "APPROVAL PRODUCTION" BY currentUser() AFTER startOfDay()) ORDER BY updated DESC`;
-const DEFAULT_JQL_QUEUE  = `assignee = currentUser() AND status in ("QA STAGE","QA PRODUCTION") ORDER BY priority DESC, updated ASC`;
+// DEFAULT JQL — based on actual workflow:
+// Sent Back to Dev:  QA Stage → Triage (reopened by QA)
+//                    QA Production → Dev Stage (fix in stage)
+// Pushed/Closed:     QA Stage → Complete
+//                    QA Stage → Dev Prod (sent to production)
+//                    QA Production → Complete
+//                    Approval Production → Complete
+// QA Backlog:        status = "QA Backlog"
+// QA Stage (active): status = "QA Stage"
+// QA Production:     status = "QA Production"
+
+const DEFAULT_JQL_SENT_BACK = `(status CHANGED FROM "QA STAGE" TO "DEV STAGE" BY currentUser() AFTER startOfDay() OR status CHANGED FROM "QA PRODUCTION" TO "DEV PRODUCTION" BY currentUser() AFTER startOfDay()) ORDER BY updated DESC`;
+
+const DEFAULT_JQL_PUSHED = `(status CHANGED FROM "QA STAGE" TO "COMPLETE" BY currentUser() AFTER startOfDay() OR status CHANGED FROM "QA PRODUCTION" TO "COMPLETE" BY currentUser() AFTER startOfDay() OR status CHANGED FROM "APPROVAL STAGE" TO "COMPLETE" BY currentUser() AFTER startOfDay() OR status CHANGED FROM "APPROVAL PRODUCTION" TO "COMPLETE" BY currentUser() AFTER startOfDay()) ORDER BY updated DESC`;
+
+const DEFAULT_JQL_CUSTOMER = `(status CHANGED FROM "QA STAGE" TO "APPROVAL STAGE" BY currentUser() AFTER startOfDay() OR status CHANGED FROM "QA PRODUCTION" TO "APPROVAL PRODUCTION" BY currentUser() AFTER startOfDay()) ORDER BY updated DESC`;
+
+const DEFAULT_JQL_BACKLOG = `assignee = currentUser() AND status = "QA QUEUE" ORDER BY priority DESC, updated ASC`;
+
+const DEFAULT_JQL_QA_STAGE = `assignee = currentUser() AND status = "QA STAGE" ORDER BY priority DESC, updated ASC`;
+
+const DEFAULT_JQL_QA_PROD = `assignee = currentUser() AND status = "QA PRODUCTION" ORDER BY priority DESC, updated ASC`;
+
+// Combined queue = backlog + qa stage + qa production
+const DEFAULT_JQL_QUEUE = `assignee = currentUser() AND status in ("QA QUEUE","QA STAGE","QA PRODUCTION") ORDER BY priority DESC, updated ASC`;
 
 // ── State ──────────────────────────────────────────────────────────
 let pat='', proxyUrl='', jiraUrl='', connectedUser=null;
 let teamMembers=[], teamData={};
-let jqlReopen='', jqlPushed='', jqlQueue='', agingDays=3;
+let jqlSentBack='', jqlPushed='', jqlCustomer='', jqlBacklog='', jqlQaStage='', jqlQaProd='', jqlQueue='', agingDays=3;
 let trendChart=null;
 
 // ── Init ───────────────────────────────────────────────────────────
@@ -442,18 +472,25 @@ window.onload = () => {
   pat        = localStorage.getItem('qa_pat') || '';
   proxyUrl   = localStorage.getItem('qa_proxy') || '';
   jiraUrl    = localStorage.getItem('qa_jira_url') || 'https://jdac.unilogcorp.com';
-  jqlReopen  = localStorage.getItem('qa_jql_reopen') || DEFAULT_JQL_REOPEN;
-  jqlPushed  = localStorage.getItem('qa_jql_pushed') || DEFAULT_JQL_PUSHED;
-  jqlQueue   = localStorage.getItem('qa_jql_queue') || DEFAULT_JQL_QUEUE;
+  jqlSentBack = localStorage.getItem('qa_jql_sentback')  || DEFAULT_JQL_SENT_BACK;
+  jqlPushed   = localStorage.getItem('qa_jql_pushed')    || DEFAULT_JQL_PUSHED;
+  jqlCustomer = localStorage.getItem('qa_jql_customer')  || DEFAULT_JQL_CUSTOMER;
+  jqlBacklog  = localStorage.getItem('qa_jql_backlog')   || DEFAULT_JQL_BACKLOG;
+  jqlQaStage  = localStorage.getItem('qa_jql_qastage')   || DEFAULT_JQL_QA_STAGE;
+  jqlQaProd   = localStorage.getItem('qa_jql_qaprod')    || DEFAULT_JQL_QA_PROD;
+  jqlQueue    = localStorage.getItem('qa_jql_queue')    || DEFAULT_JQL_QUEUE;
   agingDays  = parseInt(localStorage.getItem('qa_aging') || '3');
   teamMembers= JSON.parse(localStorage.getItem('qa_members') || '[]');
 
   document.getElementById('s-proxy').value = proxyUrl;
   document.getElementById('s-url').value   = jiraUrl;
   document.getElementById('s-pat').value   = pat ? '••••••••••••••••' : '';
-  document.getElementById('s-jql-reopen').value = jqlReopen;
-  document.getElementById('s-jql-pushed').value = jqlPushed;
-  document.getElementById('s-jql-queue').value  = jqlQueue;
+  document.getElementById('s-jql-sentback').value  = jqlSentBack;
+  document.getElementById('s-jql-pushed').value    = jqlPushed;
+  document.getElementById('s-jql-customer').value  = jqlCustomer;
+  document.getElementById('s-jql-backlog').value   = jqlBacklog;
+  document.getElementById('s-jql-qastage').value   = jqlQaStage;
+  document.getElementById('s-jql-qaprod').value    = jqlQaProd;
   document.getElementById('s-aging').value = agingDays;
 
   renderMemberList();
@@ -606,18 +643,25 @@ function showConnResult(m,t) {
 
 // ── Settings ───────────────────────────────────────────────────────
 function saveSettings() {
-  jqlReopen = document.getElementById('s-jql-reopen').value.trim();
-  jqlPushed = document.getElementById('s-jql-pushed').value.trim();
-  jqlQueue  = document.getElementById('s-jql-queue').value.trim();
-  agingDays = parseInt(document.getElementById('s-aging').value)||3;
-  proxyUrl  = document.getElementById('s-proxy').value.trim().replace(/\/$/,'');
-  jiraUrl   = document.getElementById('s-url').value.trim().replace(/\/$/,'');
-  localStorage.setItem('qa_jql_reopen',jqlReopen);
-  localStorage.setItem('qa_jql_pushed',jqlPushed);
-  localStorage.setItem('qa_jql_queue',jqlQueue);
-  localStorage.setItem('qa_aging',agingDays);
-  localStorage.setItem('qa_proxy',proxyUrl);
-  localStorage.setItem('qa_jira_url',jiraUrl);
+  jqlSentBack = document.getElementById('s-jql-sentback').value.trim();
+  jqlPushed   = document.getElementById('s-jql-pushed').value.trim();
+  jqlCustomer = document.getElementById('s-jql-customer').value.trim();
+  jqlBacklog  = document.getElementById('s-jql-backlog').value.trim();
+  jqlQaStage  = document.getElementById('s-jql-qastage').value.trim();
+  jqlQaProd   = document.getElementById('s-jql-qaprod').value.trim();
+  agingDays   = parseInt(document.getElementById('s-aging').value)||3;
+  proxyUrl    = document.getElementById('s-proxy').value.trim().replace(/\/$/,'');
+  jiraUrl     = document.getElementById('s-url').value.trim().replace(/\/$/,'');
+  localStorage.setItem('qa_jql_sentback',  jqlSentBack);
+  localStorage.setItem('qa_jql_pushed',    jqlPushed);
+  localStorage.setItem('qa_jql_customer',  jqlCustomer);
+  localStorage.setItem('qa_jql_backlog',   jqlBacklog);
+  localStorage.setItem('qa_jql_qastage',  jqlQaStage);
+  localStorage.setItem('qa_jql_qaprod',   jqlQaProd);
+  localStorage.setItem('qa_jql_queue',    jqlQueue);
+  localStorage.setItem('qa_aging',        agingDays);
+  localStorage.setItem('qa_proxy',        proxyUrl);
+  localStorage.setItem('qa_jira_url',     jiraUrl);
   showToast('✅ Settings saved!');
 }
 
@@ -673,48 +717,63 @@ async function fetchAll() {
     lbl.textContent=`Fetching: ${m.displayName} (${i+1}/${teamMembers.length})`;
     showSbar('fetch-status',`Fetching cases for ${m.displayName}...`,'loading');
 
-    let reopened=[],pushed=[],queue=[],allIssues=[];
+    let sentBack=[],closed=[],customer=[],backlog=[],qaStage=[],qaProd=[];
+
+    // 1. Sent Back to Dev
     try {
-      const r=await jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(buildJql(jqlReopen||DEFAULT_JQL_REOPEN,m.name,date))}&maxResults=100&fields=summary,status,updated,priority,duedate,project`);
-      reopened=r.issues||[];
-    } catch(e){console.warn('reopen',m.name,e.message);}
+      const r=await jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(buildJql(jqlSentBack||DEFAULT_JQL_SENT_BACK,m.name,date))}&maxResults=100&fields=summary,status,updated,priority,duedate,project`);
+      sentBack=r.issues||[];
+    } catch(e){console.warn('sentBack',m.name,e.message);}
+
+    // 2. Closed Cases
     try {
       const r=await jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(buildJql(jqlPushed||DEFAULT_JQL_PUSHED,m.name,date))}&maxResults=100&fields=summary,status,updated,priority,duedate,project`);
-      pushed=r.issues||[];
-    } catch(e){console.warn('pushed',m.name,e.message);}
-    // Queue JQL: for past date scope to cases updated on that specific day
-    const queueTemplate = jqlQueue || DEFAULT_JQL_QUEUE;
-    let queueJql = queueTemplate.replace(/currentUser\(\)/g, `"${m.name}"`);
-    if (date !== getISTToday()) {
-      const nextDay = new Date(date + 'T00:00:00');
-      nextDay.setDate(nextDay.getDate() + 1);
-      const nextDateStr = nextDay.toLocaleDateString('en-CA');
-      queueJql = queueJql.replace('ORDER BY', `AND updatedDate >= "${date}" AND updatedDate < "${nextDateStr}" ORDER BY`);
-    }
-    console.log(`[QUEUE JQL] ${m.name} | ${date} |\n${queueJql}\n`);
-    try {
-      const r=await jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(queueJql)}&maxResults=100&fields=summary,status,updated,priority,duedate,project`);
-      queue=r.issues||[];
-    } catch(e){console.warn('queue',m.name,e.message);}
+      closed=r.issues||[];
+    } catch(e){console.warn('closed',m.name,e.message);}
 
-    allIssues=[...new Map([...pushed,...reopened,...queue].map(i=>[i.key,i])).values()];
-    // Aging = in queue and not updated for N days
-    const aging=queue.filter(i=>isAging(i.fields.updated));
-    // Overdue = has duedate in past
+    // 3. Cases Moved to Customer
+    try {
+      const r=await jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(buildJql(jqlCustomer||DEFAULT_JQL_CUSTOMER,m.name,date))}&maxResults=100&fields=summary,status,updated,priority,duedate,project`);
+      customer=r.issues||[];
+    } catch(e){console.warn('customer',m.name,e.message);}
+
+    // Helper to build queue JQL for current state (no date filter for backlog/stage/prod)
+    const buildQueueJql = (template) => template.replace(/currentUser\(\)/g, `"${m.name}"`);
+
+    // 3. QA Backlog
+    try {
+      const r=await jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(buildQueueJql(jqlBacklog||DEFAULT_JQL_BACKLOG))}&maxResults=100&fields=summary,status,updated,priority,duedate,project`);
+      backlog=r.issues||[];
+    } catch(e){console.warn('backlog',m.name,e.message);}
+
+    // 4. QA Stage (actively working)
+    try {
+      const r=await jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(buildQueueJql(jqlQaStage||DEFAULT_JQL_QA_STAGE))}&maxResults=100&fields=summary,status,updated,priority,duedate,project`);
+      qaStage=r.issues||[];
+    } catch(e){console.warn('qaStage',m.name,e.message);}
+
+    // 5. QA Production
+    try {
+      const r=await jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(buildQueueJql(jqlQaProd||DEFAULT_JQL_QA_PROD))}&maxResults=100&fields=summary,status,updated,priority,duedate,project`);
+      qaProd=r.issues||[];
+    } catch(e){console.warn('qaProd',m.name,e.message);}
+
+    const allIssues=[...new Map([...closed,...customer,...sentBack,...backlog,...qaStage,...qaProd].map(i=>[i.key,i])).values()];
+    // Aging = QA Stage cases not updated for N+ days
+    const aging=qaStage.filter(i=>isAging(i.fields.updated));
+    // Overdue = any case with past due date
     const overdue=allIssues.filter(i=>isOverdue(i.fields.duedate));
-    // Priority breakdown from queue
+    // Priority breakdown from active QA Stage cases
     const priorities={critical:0,high:0,medium:0,low:0};
-    queue.forEach(i=>{
+    [...qaStage,...qaProd].forEach(i=>{
       const p=(i.fields.priority?.name||'').toLowerCase();
       if(p==='critical'||p==='blocker') priorities.critical++;
       else if(p==='high'||p==='major') priorities.high++;
       else if(p==='medium'||p==='normal') priorities.medium++;
       else priorities.low++;
     });
-    // Reopen rate
-    const reopenRate = pushed.length > 0 ? Math.round((reopened.length/pushed.length)*100) : 0;
 
-    teamData[m.name]={member:m,reopened,pushed,queue,aging,overdue,priorities,reopenRate,allIssues};
+    teamData[m.name]={member:m, sentBack, closed, customer, backlog, qaStage, qaProd, aging, overdue, priorities, allIssues};
   }
 
   fill.style.width='100%';
@@ -729,16 +788,21 @@ async function fetchAll() {
 
 // ── Team Overview ──────────────────────────────────────────────────
 function renderTeamOverview() {
-  const allPushed  = Object.values(teamData).flatMap(d=>d.pushed);
-  const allReopen  = Object.values(teamData).flatMap(d=>d.reopened);
-  const allQueue   = Object.values(teamData).flatMap(d=>d.queue);
-  const allAging   = Object.values(teamData).flatMap(d=>d.aging);
-  const allOverdue = Object.values(teamData).flatMap(d=>d.overdue);
-
+  const allClosed   = Object.values(teamData).flatMap(d=>d.closed||[]);
+  const allCustomer = Object.values(teamData).flatMap(d=>d.customer||[]);
+  const allSentBack = Object.values(teamData).flatMap(d=>d.sentBack||[]);
+  const allBacklog  = Object.values(teamData).flatMap(d=>d.backlog||[]);
+  const allQaStage  = Object.values(teamData).flatMap(d=>d.qaStage||[]);
+  const allQaProd   = Object.values(teamData).flatMap(d=>d.qaProd||[]);
+  const allAging    = Object.values(teamData).flatMap(d=>d.aging||[]);
+  const allOverdue  = Object.values(teamData).flatMap(d=>d.overdue||[]);
   document.getElementById('team-stats').innerHTML=`
-    <div class="stat"><div class="stat-num c-green">${allPushed.length}</div><div class="stat-lbl">Pushed to Customer</div></div>
-    <div class="stat"><div class="stat-num c-orange">${allReopen.length}</div><div class="stat-lbl">Sent Back to Dev</div></div>
-    <div class="stat"><div class="stat-num c-blue">${allQueue.length}</div><div class="stat-lbl">In QA Queue</div></div>
+    <div class="stat"><div class="stat-num c-green">${allClosed.length}</div><div class="stat-lbl">Closed Today</div></div>
+    <div class="stat"><div class="stat-num c-teal">${allCustomer.length}</div><div class="stat-lbl">Moved to Customer</div></div>
+    <div class="stat"><div class="stat-num c-orange">${allSentBack.length}</div><div class="stat-lbl">Sent Back to Dev</div></div>
+    <div class="stat"><div class="stat-num" style="color:var(--muted)">${allBacklog.length}</div><div class="stat-lbl">QA Backlog</div></div>
+    <div class="stat"><div class="stat-num c-blue">${allQaStage.length}</div><div class="stat-lbl">QA Stage</div></div>
+    <div class="stat"><div class="stat-num c-teal">${allQaProd.length}</div><div class="stat-lbl">QA Production</div></div>
     <div class="stat"><div class="stat-num c-red">${allAging.length}</div><div class="stat-lbl">Aging (${agingDays}d+)</div></div>
     <div class="stat"><div class="stat-num c-red">${allOverdue.length}</div><div class="stat-lbl">Overdue</div></div>
     <div class="stat"><div class="stat-num c-teal">${teamMembers.length}</div><div class="stat-lbl">Members</div></div>`;
@@ -754,7 +818,7 @@ function renderTabs(date) {
 
   teamMembers.forEach((m,idx)=>{
     const d=teamData[m.name];
-    const total=(d?.pushed?.length||0)+(d?.reopened?.length||0);
+    const total=(d?.closed?.length||0)+(d?.sentBack?.length||0);
     const hasAlerts=(d?.aging?.length||0)+(d?.overdue?.length||0);
     const color=avatarColor(m.displayName);
 
@@ -777,62 +841,59 @@ function renderTabs(date) {
 
 function buildPanel(d,idx,today,m) {
   if(!d) return `<div class="empty-state">No data fetched for this member.</div>`;
-  const {pushed,reopened,queue,aging,overdue,priorities}=d;
+  const {closed,sentBack,customer,backlog,qaStage,qaProd,aging,overdue,priorities}=d;
   const mid=`m${idx}`;
   const color=avatarColor(m.displayName);
 
-  // QA Queue list
-  const queueList = queue.length
-    ? queue.map(i=>`• ${i.key} — ${i.fields.summary} [${i.fields.priority?.name||''}]`).join('\n')
-    : 'No cases currently in QA stage.';
+  const mkList = (arr, empty) => arr.length
+    ? arr.map(i=>`• ${i.key} — ${i.fields.summary}`).join('\n')
+    : empty;
+  const mkListWithStatus = (arr, empty) => arr.length
+    ? arr.map(i=>`• ${i.key} — ${i.fields.summary}\n  Status: ${i.fields.status?.name||'—'} | Priority: ${i.fields.priority?.name||'—'}`).join('\n')
+    : empty;
+  const mkLines = (arr) => arr.length ? arr.map(i=>`   • ${i.key} — ${i.fields.summary}`).join('\n') : '   None';
+  const mkLinesP = (arr) => arr.length ? arr.map(i=>`   • ${i.key} — ${i.fields.summary} [${i.fields.priority?.name||'—'}]`).join('\n') : '   None';
 
-  // Pushed to Customer list
-  const pushedList = pushed.length
-    ? pushed.map(i=>`• ${i.key} — ${i.fields.summary}`).join('\n')
-    : 'No cases pushed to customer today.';
-
-  // Sent Back to Dev list
-  const sentBackList = reopened.length
-    ? reopened.map(i=>`• ${i.key} — ${i.fields.summary}`).join('\n')
-    : 'No cases sent back to dev today.';
-
-  // Key updates includes all three counts + full case lists
-  const pushedLines  = pushed.length  ? pushed.map(i=>`   • ${i.key} — ${i.fields.summary}`).join('\n')  : '   None';
-  const sentBackLines= reopened.length? reopened.map(i=>`   • ${i.key} — ${i.fields.summary}`).join('\n'): '   None';
-  const queueLines   = queue.length   ? queue.map(i=>`   • ${i.key} — ${i.fields.summary} [${i.fields.priority?.name||'—'}]`).join('\n'): '   None';
+  const closedList    = mkListWithStatus(closed,   'No cases closed today.');
+  const customerList  = mkListWithStatus(customer, 'No cases moved to customer today.');
+  const sentBackList = mkList(sentBack, 'No cases sent back to dev today.');
+  const backlogList  = mkList(backlog,  'No cases in QA backlog.');
+  const qaStageList  = mkLinesP(qaStage);
+  const qaProdList   = mkLinesP(qaProd);
 
   const keyUpdates = `QA Daily Update — ${today}
 Member: ${m.displayName} (${m.name})
 
-✅ Pushed to Customer (${pushed.length}):
-${pushedLines}
+✅ Closed Cases (QA Stage / QA Production / Approval Stage → Complete) (${closed.length}):
+${mkLines(closed)}
 
-🔄 Sent Back to Dev (${reopened.length}):
-${sentBackLines}
+📤 Cases Moved to Customer (QA Stage / QA Production → Approval) (${customer.length}):
+${mkLines(customer)}
 
-📋 Currently in QA Stage (${queue.length}):
-${queueLines}
+🔄 Sent Back to Dev (${sentBack.length}):
+${mkLines(sentBack)}
+
+📋 QA Backlog (${backlog.length}):
+${mkLines(backlog)}
+
+🔵 QA Stage — Currently Working (${qaStage.length}):
+${qaStageList}
+
+🟣 QA Production (${qaProd.length}):
+${qaProdList}
 
 ⏰ Aging Cases (${agingDays}d+): ${aging.length}${aging.length?'\n'+aging.map(i=>`   • ${i.key} — ${i.fields.summary}`).join('\n'):''}
 🔴 Overdue Cases: ${overdue.length}${overdue.length?'\n'+overdue.map(i=>`   • ${i.key} — ${i.fields.summary}`).join('\n'):''}`.trim();
 
-  const pushedRows=pushed.map(i=>`<tr>
+  const mkRows = (arr) => arr.map(i=>`<tr>
     <td><span class="tkey">${i.key}</span></td>
     <td style="max-width:240px;font-size:11px">${i.fields.summary||''}</td>
     <td><span class="spill ${spillClass(i.fields.status?.name)}">${i.fields.status?.name||''}</span></td>
     <td>${i.fields.priority?.name?`<span class="spill ${getPriorityClass(i.fields.priority.name)}">${i.fields.priority.name}</span>`:''}</td>
   </tr>`).join('');
 
-  const sentBackRows=reopened.map(i=>`<tr>
-    <td><span class="tkey">${i.key}</span></td>
-    <td style="max-width:240px;font-size:11px">${i.fields.summary||''}</td>
-    <td><span class="spill ${spillClass(i.fields.status?.name)}">${i.fields.status?.name||''}</span></td>
-    <td>${i.fields.priority?.name?`<span class="spill ${getPriorityClass(i.fields.priority.name)}">${i.fields.priority.name}</span>`:''}</td>
-  </tr>`).join('');
-
-  const queueRows=queue.map(i=>{
-    const aged=isAging(i.fields.updated);
-    const od=isOverdue(i.fields.duedate);
+  const mkQueueRows = (arr) => arr.map(i=>{
+    const aged=isAging(i.fields.updated), od=isOverdue(i.fields.duedate);
     return `<tr>
       <td><span class="tkey">${i.key}</span></td>
       <td style="max-width:200px;font-size:11px">${i.fields.summary||''}</td>
@@ -841,28 +902,33 @@ ${queueLines}
       <td style="color:var(--muted);font-size:10px">${i.fields.duedate||'—'}</td>
     </tr>`;}).join('');
 
-  const agingAlert   = aging.length   ? `<div class="alert alert-warning">⏰ <strong>${aging.length} aging case${aging.length>1?'s':''}</strong> — not updated in ${agingDays}+ days: ${aging.map(i=>i.key).join(', ')}</div>` : '';
-  const overdueAlert = overdue.length ? `<div class="alert alert-danger">🔴 <strong>${overdue.length} overdue case${overdue.length>1?'s':''}</strong> — past due date: ${overdue.map(i=>i.key).join(', ')}</div>` : '';
+  const agingAlert   = aging.length   ? `<div class="alert alert-warning">⏰ <strong>${aging.length} aging</strong> in QA Stage: ${aging.map(i=>i.key).join(', ')}</div>` : '';
+  const overdueAlert = overdue.length ? `<div class="alert alert-danger">🔴 <strong>${overdue.length} overdue</strong>: ${overdue.map(i=>i.key).join(', ')}</div>` : '';
 
   return `
   <div class="member-hdr">
     <div class="avatar" style="background:${color};width:38px;height:38px;font-size:14px">${initials(m.displayName)}</div>
     <div><div class="member-name">${m.displayName}</div><div class="member-sub">${m.email||m.name}</div></div>
     <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">
-      <span style="background:rgba(62,207,142,0.1);color:var(--success);border-radius:4px;padding:2px 8px;font-size:10px;font-family:var(--mono)">✅ ${pushed.length} pushed to customer</span>
-      <span style="background:rgba(245,166,35,0.1);color:var(--warning);border-radius:4px;padding:2px 8px;font-size:10px;font-family:var(--mono)">🔄 ${reopened.length} sent back to dev</span>
-      <span style="background:rgba(79,142,247,0.1);color:var(--accent);border-radius:4px;padding:2px 8px;font-size:10px;font-family:var(--mono)">📋 ${queue.length} in queue</span>
+      <span style="background:rgba(62,207,142,0.1);color:var(--success);border-radius:4px;padding:2px 8px;font-size:10px;font-family:var(--mono)">✅ ${closed.length} closed</span>
+      <span style="background:rgba(6,182,212,0.1);color:var(--info);border-radius:4px;padding:2px 8px;font-size:10px;font-family:var(--mono)">📤 ${customer.length} to customer</span>
+      <span style="background:rgba(245,166,35,0.1);color:var(--warning);border-radius:4px;padding:2px 8px;font-size:10px;font-family:var(--mono)">🔄 ${sentBack.length} sent back</span>
+      <span style="background:rgba(107,112,128,0.15);color:var(--muted);border-radius:4px;padding:2px 8px;font-size:10px;font-family:var(--mono)">📥 ${backlog.length} backlog</span>
+      <span style="background:rgba(79,142,247,0.1);color:var(--accent);border-radius:4px;padding:2px 8px;font-size:10px;font-family:var(--mono)">🔵 ${qaStage.length} QA stage</span>
+      <span style="background:rgba(6,182,212,0.1);color:var(--info);border-radius:4px;padding:2px 8px;font-size:10px;font-family:var(--mono)">🟣 ${qaProd.length} QA prod</span>
       ${aging.length?`<span style="background:rgba(240,82,82,0.1);color:var(--danger);border-radius:4px;padding:2px 8px;font-size:10px;font-family:var(--mono)">⏰ ${aging.length} aging</span>`:''}
-      ${overdue.length?`<span style="background:rgba(240,82,82,0.1);color:var(--danger);border-radius:4px;padding:2px 8px;font-size:10px;font-family:var(--mono)">🔴 ${overdue.length} overdue</span>`:''}
     </div>
   </div>
 
   ${agingAlert}${overdueAlert}
 
   <div class="mini-stats">
-    <div class="mini-stat"><div class="mini-num c-green">${pushed.length}</div><div class="mini-lbl">Pushed to Customer</div></div>
-    <div class="mini-stat"><div class="mini-num c-orange">${reopened.length}</div><div class="mini-lbl">Sent Back to Dev</div></div>
-    <div class="mini-stat"><div class="mini-num c-blue">${queue.length}</div><div class="mini-lbl">In QA Queue</div></div>
+    <div class="mini-stat"><div class="mini-num c-green">${closed.length}</div><div class="mini-lbl">Closed</div></div>
+    <div class="mini-stat"><div class="mini-num c-teal">${customer.length}</div><div class="mini-lbl">To Customer</div></div>
+    <div class="mini-stat"><div class="mini-num c-orange">${sentBack.length}</div><div class="mini-lbl">Sent Back</div></div>
+    <div class="mini-stat"><div class="mini-num" style="color:var(--muted)">${backlog.length}</div><div class="mini-lbl">Backlog</div></div>
+    <div class="mini-stat"><div class="mini-num c-blue">${qaStage.length}</div><div class="mini-lbl">QA Stage</div></div>
+    <div class="mini-stat"><div class="mini-num c-teal">${qaProd.length}</div><div class="mini-lbl">QA Prod</div></div>
     <div class="mini-stat"><div class="mini-num c-red">${priorities.critical}</div><div class="mini-lbl">Critical</div></div>
     <div class="mini-stat"><div class="mini-num c-orange">${priorities.high}</div><div class="mini-lbl">High</div></div>
     <div class="mini-stat"><div class="mini-num c-blue">${priorities.medium}</div><div class="mini-lbl">Medium</div></div>
@@ -871,19 +937,25 @@ ${queueLines}
     <div class="mini-stat"><div class="mini-num c-red">${overdue.length}</div><div class="mini-lbl">Overdue</div></div>
   </div>
 
-  ${pushed.length?`
-  <div style="font-family:var(--mono);font-size:10px;color:var(--success);margin:12px 0 6px;letter-spacing:0.5px">✅ PUSHED TO CUSTOMER (${pushed.length})</div>
-  <div class="tbl-wrap"><table><thead><tr><th>Key</th><th>Summary</th><th>Status</th><th>Priority</th></tr></thead><tbody>${pushedRows}</tbody></table></div>`
-  :'<div style="color:var(--muted);font-size:12px;margin:8px 0 4px">No cases pushed to customer today.</div>'}
+  ${closed.length?`<div style="font-family:var(--mono);font-size:10px;color:var(--success);margin:12px 0 6px;letter-spacing:0.5px">✅ CLOSED CASES — QA Stage / QA Production / Approval Stage → Complete (${closed.length})</div>
+  <div class="tbl-wrap"><table><thead><tr><th>Key</th><th>Summary</th><th>Closed From</th><th>Priority</th></tr></thead><tbody>${mkRows(closed)}</tbody></table></div>`
+  :'<div style="color:var(--muted);font-size:12px;margin:8px 0 4px">No cases closed today.</div>'}
 
-  ${reopened.length?`
-  <div style="font-family:var(--mono);font-size:10px;color:var(--warning);margin:12px 0 6px;letter-spacing:0.5px">🔄 SENT BACK TO DEV (${reopened.length})</div>
-  <div class="tbl-wrap"><table><thead><tr><th>Key</th><th>Summary</th><th>Status</th><th>Priority</th></tr></thead><tbody>${sentBackRows}</tbody></table></div>`
+  ${customer.length?`<div style="font-family:var(--mono);font-size:10px;color:var(--info);margin:12px 0 6px;letter-spacing:0.5px">📤 CASES MOVED TO CUSTOMER — Approval Stage / Approval Production (${customer.length})</div>
+  <div class="tbl-wrap"><table><thead><tr><th>Key</th><th>Summary</th><th>Moved From</th><th>Priority</th></tr></thead><tbody>${mkRows(customer)}</tbody></table></div>`:''}
+
+  ${sentBack.length?`<div style="font-family:var(--mono);font-size:10px;color:var(--warning);margin:12px 0 6px;letter-spacing:0.5px">🔄 SENT BACK TO DEV (${sentBack.length})</div>
+  <div class="tbl-wrap"><table><thead><tr><th>Key</th><th>Summary</th><th>Status</th><th>Priority</th></tr></thead><tbody>${mkRows(sentBack)}</tbody></table></div>`
   :'<div style="color:var(--muted);font-size:12px;margin:8px 0 4px">No cases sent back to dev today.</div>'}
 
-  ${queue.length?`
-  <div style="font-family:var(--mono);font-size:10px;color:var(--accent);margin:12px 0 6px;letter-spacing:0.5px">📋 QA QUEUE (${queue.length})</div>
-  <div class="tbl-wrap"><table><thead><tr><th>Key</th><th>Summary</th><th>Priority</th><th>Flags</th><th>Due</th></tr></thead><tbody>${queueRows}</tbody></table></div>`:''}
+  ${backlog.length?`<div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin:12px 0 6px;letter-spacing:0.5px">📥 QA BACKLOG (${backlog.length})</div>
+  <div class="tbl-wrap"><table><thead><tr><th>Key</th><th>Summary</th><th>Status</th><th>Priority</th></tr></thead><tbody>${mkRows(backlog)}</tbody></table></div>`:''}
+
+  ${qaStage.length?`<div style="font-family:var(--mono);font-size:10px;color:var(--accent);margin:12px 0 6px;letter-spacing:0.5px">🔵 QA STAGE — CURRENTLY WORKING (${qaStage.length})</div>
+  <div class="tbl-wrap"><table><thead><tr><th>Key</th><th>Summary</th><th>Priority</th><th>Flags</th><th>Due</th></tr></thead><tbody>${mkQueueRows(qaStage)}</tbody></table></div>`:''}
+
+  ${qaProd.length?`<div style="font-family:var(--mono);font-size:10px;color:var(--info);margin:12px 0 6px;letter-spacing:0.5px">🟣 QA PRODUCTION (${qaProd.length})</div>
+  <div class="tbl-wrap"><table><thead><tr><th>Key</th><th>Summary</th><th>Priority</th><th>Flags</th><th>Due</th></tr></thead><tbody>${mkQueueRows(qaProd)}</tbody></table></div>`:''}
 
   <div style="display:flex;align-items:center;justify-content:space-between;margin-top:18px;margin-bottom:10px">
     <div style="font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:1px">📋 TEAMS FORM — ${m.displayName.split(' ')[0].toUpperCase()}</div>
@@ -893,81 +965,124 @@ ${queueLines}
   <div class="form-body">
     <div class="fld">
       <div class="fld-label">Key Updates <button class="copy-btn" onclick="cpTA('${mid}-ku',this)">Copy</button></div>
-      <textarea class="fld-ta" id="${mid}-ku" rows="6">${keyUpdates}</textarea>
+      <textarea class="fld-ta" id="${mid}-ku" rows="8">${keyUpdates}</textarea>
     </div>
-
     <div class="fld">
-      <div class="fld-label">Cases Pushed to Customer or Closed <button class="copy-btn" onclick="cpRO('${mid}-cc',this)">Copy</button></div>
-      <div class="fld-ro" id="${mid}-cc">${pushedList}</div>
+      <div class="fld-label">Closed Cases (QA Stage / QA Production / Approval Stage → Complete) <button class="copy-btn" onclick="cpRO('${mid}-cc',this)">Copy</button></div>
+      <div class="fld-ro" id="${mid}-cc">${closedList}</div>
     </div>
-
     <div class="fld">
-      <div class="fld-label">Count — Cases Pushed to Customer or Closed <button class="copy-btn" onclick="cpRO('${mid}-nc',this)">Copy</button></div>
-      <div class="fld-num c-green" id="${mid}-nc" style="max-width:120px">${pushed.length}</div>
+      <div class="fld-label">Count — Closed Cases <button class="copy-btn" onclick="cpRO('${mid}-nc',this)">Copy</button></div>
+      <div class="fld-num c-green" id="${mid}-nc" style="max-width:120px">${closed.length}</div>
     </div>
-
     <div class="fld">
-      <div class="fld-label">Cases Sent Back to Dev (Reopened) <button class="copy-btn" onclick="cpRO('${mid}-cr',this)">Copy</button></div>
+      <div class="fld-label">Cases Moved to Customer (QA Stage / QA Production → Approval) <button class="copy-btn" onclick="cpRO('${mid}-cu',this)">Copy</button></div>
+      <div class="fld-ro" id="${mid}-cu">${customerList}</div>
+    </div>
+    <div class="fld">
+      <div class="fld-label">Count — Moved to Customer <button class="copy-btn" onclick="cpRO('${mid}-nu',this)">Copy</button></div>
+      <div class="fld-num c-teal" id="${mid}-nu" style="max-width:120px">${customer.length}</div>
+    </div>
+    <div class="fld">
+      <div class="fld-label">Cases Sent Back to Dev <button class="copy-btn" onclick="cpRO('${mid}-cr',this)">Copy</button></div>
       <div class="fld-ro" id="${mid}-cr">${sentBackList}</div>
     </div>
-
     <div class="fld">
-      <div class="fld-label">Count — Cases Sent Back to Dev <button class="copy-btn" onclick="cpRO('${mid}-nr',this)">Copy</button></div>
-      <div class="fld-num c-orange" id="${mid}-nr" style="max-width:120px">${reopened.length}</div>
+      <div class="fld-label">Count — Sent Back to Dev <button class="copy-btn" onclick="cpRO('${mid}-nr',this)">Copy</button></div>
+      <div class="fld-num c-orange" id="${mid}-nr" style="max-width:120px">${sentBack.length}</div>
     </div>
-
+    <div class="fld">
+      <div class="fld-label">Cases in QA Backlog <button class="copy-btn" onclick="cpRO('${mid}-bl',this)">Copy</button></div>
+      <div class="fld-ro" id="${mid}-bl">${backlogList}</div>
+    </div>
     <div class="fld">
       <div class="fld-label">Cases Currently in QA Stage <button class="copy-btn" onclick="cpRO('${mid}-cq',this)">Copy</button></div>
-      <div class="fld-ro" id="${mid}-cq">${queueList}</div>
+      <div class="fld-ro" id="${mid}-cq">${qaStageList}</div>
     </div>
-
     <div class="fld">
-      <div class="fld-label">Count — Cases in QA Stage <button class="copy-btn" onclick="cpRO('${mid}-nq',this)">Copy</button></div>
-      <div class="fld-num c-blue" id="${mid}-nq" style="max-width:120px">${queue.length}</div>
+      <div class="fld-label">Count — QA Stage <button class="copy-btn" onclick="cpRO('${mid}-nq',this)">Copy</button></div>
+      <div class="fld-num c-blue" id="${mid}-nq" style="max-width:120px">${qaStage.length}</div>
     </div>
-
+    <div class="fld">
+      <div class="fld-label">Cases in QA Production <button class="copy-btn" onclick="cpRO('${mid}-qp',this)">Copy</button></div>
+      <div class="fld-ro" id="${mid}-qp">${qaProdList}</div>
+    </div>
+    <div class="fld">
+      <div class="fld-label">Count — QA Production <button class="copy-btn" onclick="cpRO('${mid}-np',this)">Copy</button></div>
+      <div class="fld-num c-teal" id="${mid}-np" style="max-width:120px">${qaProd.length}</div>
+    </div>
     <div class="fld">
       <div class="fld-label">Plans for Tomorrow <button class="copy-btn" onclick="cpTA('${mid}-pl',this)">Copy</button></div>
       <textarea class="fld-ta" id="${mid}-pl" rows="4" placeholder="What is ${m.displayName.split(' ')[0]} planning to work on tomorrow?"></textarea>
     </div>
-
     <div class="fld">
       <div class="fld-label">Additional Comments <button class="copy-btn" onclick="cpTA('${mid}-cm',this)">Copy</button></div>
-      <textarea class="fld-ta" id="${mid}-cm" rows="4">${queue.length} case${queue.length!==1?'s':''} currently in QA stage.${aging.length>0?' Aging case(s): '+aging.map(i=>i.key).join(', ')+'.':''}${overdue.length>0?' Overdue case(s): '+overdue.map(i=>i.key).join(', ')+'.':''}</textarea>
+      <textarea class="fld-ta" id="${mid}-cm" rows="3">${qaStage.length} case${qaStage.length!==1?'s':''} in QA Stage. ${qaProd.length} in QA Production. ${backlog.length} in backlog.${aging.length>0?' Aging: '+aging.map(i=>i.key).join(', ')+'.':''}${overdue.length>0?' Overdue: '+overdue.map(i=>i.key).join(', ')+'.':''}</textarea>
     </div>
   </div>`;
 }
+
 
 // ── Copy helpers ───────────────────────────────────────────────────
 function cpTA(id,btn){const el=document.getElementById(id);if(!el)return;navigator.clipboard.writeText(el.value).then(()=>flash(btn));}
 function cpRO(id,btn){const el=document.getElementById(id);if(!el)return;navigator.clipboard.writeText(el.innerText).then(()=>flash(btn));}
 function flash(btn){if(!btn)return;const o=btn.innerHTML;btn.innerHTML='✓';btn.classList.add('copied');setTimeout(()=>{btn.innerHTML=o;btn.classList.remove('copied');},1500);}
 function copyAll(mid,name){
-  const ku=document.getElementById(`${mid}-ku`)?.value||'';
-  const cc=document.getElementById(`${mid}-cc`)?.innerText||'';
-  const nc=document.getElementById(`${mid}-nc`)?.innerText||'';
-  const cr=document.getElementById(`${mid}-cr`)?.innerText||'';
-  const nr=document.getElementById(`${mid}-nr`)?.innerText||'';
-  const cq=document.getElementById(`${mid}-cq`)?.innerText||'';
-  const nq=document.getElementById(`${mid}-nq`)?.innerText||'';
-  const pl=document.getElementById(`${mid}-pl`)?.value||'';
-  const cm=document.getElementById(`${mid}-cm`)?.value||'';
-  const txt=`=== ${name} ===\n\n--- KEY UPDATES ---\n${ku}\n\n--- CASES PUSHED TO CUSTOMER ---\n${cc}\n\n--- COUNT PUSHED: ${nc} ---\n\n--- CASES SENT BACK TO DEV ---\n${cr}\n\n--- COUNT SENT BACK: ${nr} ---\n\n--- CASES CURRENTLY IN QA STAGE ---\n${cq}\n\n--- COUNT IN QA STAGE: ${nq} ---\n\n--- PLANS FOR TOMORROW ---\n${pl}\n\n--- ADDITIONAL COMMENTS ---\n${cm}`;
+  const get = (id,ta) => { const el=document.getElementById(id); return el?(ta?el.value:el.innerText):''; };
+  const txt=`=== ${name} ===
+
+--- KEY UPDATES ---
+${get(mid+'-ku',true)}
+
+--- CLOSED CASES ---
+${get(mid+'-cc')}
+
+--- COUNT CLOSED: ${get(mid+'-nc')} ---
+
+--- CASES MOVED TO CUSTOMER ---
+${get(mid+'-cu')}
+
+--- COUNT MOVED TO CUSTOMER: ${get(mid+'-nu')} ---
+
+--- CASES SENT BACK TO DEV ---
+${get(mid+'-cr')}
+
+--- COUNT SENT BACK: ${get(mid+'-nr')} ---
+
+--- QA BACKLOG ---
+${get(mid+'-bl')}
+
+--- QA STAGE (WORKING) ---
+${get(mid+'-cq')}
+
+--- COUNT QA STAGE: ${get(mid+'-nq')} ---
+
+--- QA PRODUCTION ---
+${get(mid+'-qp')}
+
+--- COUNT QA PROD: ${get(mid+'-np')} ---
+
+--- PLANS FOR TOMORROW ---
+${get(mid+'-pl',true)}
+
+--- ADDITIONAL COMMENTS ---
+${get(mid+'-cm',true)}`;
   navigator.clipboard.writeText(txt).then(()=>showToast(`✅ ${name}'s fields copied!`));
 }
+
 
 // ── Leaderboard ────────────────────────────────────────────────────
 function renderLeaderboard() {
   const card=document.getElementById('lb-card');
   if(!Object.keys(teamData).length){card.innerHTML='<div class="empty-state">Fetch team data first.</div>';return;}
   const sorted=[...teamMembers].map(m=>({m,d:teamData[m.name]})).filter(x=>x.d)
-    .sort((a,b)=>(b.d.pushed.length-a.d.pushed.length));
-  const max=Math.max(...sorted.map(x=>x.d.pushed.length),1);
+    .sort((a,b)=>((b.d.closed?.length||0)-(a.d.closed?.length||0)));
+  const max=Math.max(...sorted.map(x=>x.d.closed?.length||0),1);
 
-  card.innerHTML=`<div class="card-title">🏆 Today's Leaderboard — Pushed to Customer</div>`+
+  card.innerHTML=`<div class="card-title">🏆 Today's Leaderboard — Cases Closed</div>`+
   sorted.map(({m,d},i)=>{
     const rankClass=i===0?'gold':i===1?'silver':i===2?'bronze':'';
-    const pct=Math.round((d.pushed.length/max)*100);
+    const pct=Math.round(((d.closed?.length||0)/max)*100);
     const color=avatarColor(m.displayName);
     return `<div class="lb-row">
       <div class="lb-rank ${rankClass}">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</div>
@@ -977,8 +1092,9 @@ function renderLeaderboard() {
         <div class="lb-bar-wrap"><div class="lb-bar" style="width:${pct}%;background:${color}"></div></div>
       </div>
       <div class="lb-nums">
-        <div style="color:var(--success)">${d.pushed.length} pushed</div>
-        <div style="color:var(--warning);font-size:10px">${d.reopened.length} sent back</div>
+        <div style="color:var(--success)">${d.closed?.length||0} closed</div>
+        <div style="color:var(--warning);font-size:10px">${d.sentBack?.length||0} sent back</div>
+        <div style="color:var(--accent);font-size:10px">${d.qaStage?.length||0} QA stage</div>
       </div>
     </div>`;}).join('');
 }
@@ -1011,7 +1127,7 @@ async function fetchTrends() {
         teamPushed[di]+=r.total||0;
       }catch(e){}
       try{
-        const r=await jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(buildJql(jqlReopen||DEFAULT_JQL_REOPEN,m.name,date))}&maxResults=100&fields=summary`);
+        const r=await jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(buildJql(jqlSentBack||DEFAULT_JQL_SENT_BACK,m.name,date))}&maxResults=100&fields=summary`);
         memberTrends[m.name].reopen[di]=r.total||0;
         teamReopen[di]+=r.total||0;
       }catch(e){}
@@ -1026,8 +1142,8 @@ async function fetchTrends() {
     data:{
       labels,
       datasets:[
-        {label:'Pushed',data:teamPushed,backgroundColor:'rgba(62,207,142,0.6)',borderColor:'#3ecf8e',borderWidth:1,borderRadius:4},
-        {label:'Reopened',data:teamReopen,backgroundColor:'rgba(245,166,35,0.6)',borderColor:'#f5a623',borderWidth:1,borderRadius:4}
+        {label:'Closed',data:teamPushed,backgroundColor:'rgba(62,207,142,0.6)',borderColor:'#3ecf8e',borderWidth:1,borderRadius:4},
+        {label:'Sent Back to Dev',data:teamReopen,backgroundColor:'rgba(245,166,35,0.6)',borderColor:'#f5a623',borderWidth:1,borderRadius:4}
       ]
     },
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#e8eaf0',font:{size:11}}}},scales:{x:{ticks:{color:'#6b7080',font:{size:10}},grid:{color:'#2a2d3a'}},y:{ticks:{color:'#6b7080',font:{size:10},stepSize:1},grid:{color:'#2a2d3a'},beginAtZero:true}}}
@@ -1046,8 +1162,8 @@ async function fetchTrends() {
         <div style="display:flex;gap:4px">${td.pushed.map((v,i)=>`<div title="${labels[i]}: ${v} pushed" style="flex:1;height:24px;background:rgba(62,207,142,${Math.max(0.1,v/Math.max(...td.pushed,1))});border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-family:var(--mono);color:var(--success)">${v||''}</div>`).join('')}</div>
       </div>
       <div style="text-align:right;font-family:var(--mono);font-size:11px;min-width:70px">
-        <div style="color:var(--success)">${totalP} pushed</div>
-        <div style="color:var(--warning)">${totalR} reopen</div>
+        <div style="color:var(--success)">${totalP} closed</div>
+        <div style="color:var(--warning)">${totalR} sent back</div>
       </div>
     </div>`;}).join('');
 
@@ -1062,12 +1178,14 @@ function saveToHistory(date) {
     timestamp:new Date().toISOString(),
     members:teamMembers.map(m=>({
       name:m.name,displayName:m.displayName,
-      pushed:teamData[m.name]?.pushed?.length||0,
-      reopened:teamData[m.name]?.reopened?.length||0,
-      queue:teamData[m.name]?.queue?.length||0,
+      closed:teamData[m.name]?.closed?.length||0,
+      customer:teamData[m.name]?.customer?.length||0,
+      sentBack:teamData[m.name]?.sentBack?.length||0,
+      backlog:teamData[m.name]?.backlog?.length||0,
+      qaStage:teamData[m.name]?.qaStage?.length||0,
+      qaProd:teamData[m.name]?.qaProd?.length||0,
       aging:teamData[m.name]?.aging?.length||0,
       overdue:teamData[m.name]?.overdue?.length||0,
-      reopenRate:teamData[m.name]?.reopenRate||0,
     }))
   };
   // Remove existing entry for same date
@@ -1081,14 +1199,14 @@ function renderHistoryList() {
   const el=document.getElementById('history-list');
   if(!hist.length){el.innerHTML='<div class="empty-state">No history yet. Fetch team data to start recording.</div>';return;}
   el.innerHTML=hist.map(h=>{
-    const totalP=h.members.reduce((a,m)=>a+m.pushed,0);
-    const totalR=h.members.reduce((a,m)=>a+m.reopened,0);
+    const totalP=h.members.reduce((a,m)=>a+(m.closed||0),0);
+    const totalR=h.members.reduce((a,m)=>a+(m.sentBack||0),0);
     const dateLabel=new Date(h.date+'T00:00:00').toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
     return `<div class="hist-item" onclick="showHistoryDetail('${h.date}')">
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
         <div class="hist-date">${dateLabel}</div>
         <div style="display:flex;gap:8px">
-          <span style="background:rgba(62,207,142,0.1);color:var(--success);border-radius:4px;padding:2px 8px;font-size:10px;font-family:var(--mono)">${totalP} pushed</span>
+          <span style="background:rgba(62,207,142,0.1);color:var(--success);border-radius:4px;padding:2px 8px;font-size:10px;font-family:var(--mono)">${totalP} closed</span>
           <span style="background:rgba(245,166,35,0.1);color:var(--warning);border-radius:4px;padding:2px 8px;font-size:10px;font-family:var(--mono)">${totalR} reopened</span>
         </div>
       </div>
@@ -1102,7 +1220,7 @@ function showHistoryDetail(date) {
   const h=hist.find(x=>x.date===date);
   if(!h) return;
   const dateLabel=new Date(h.date+'T00:00:00').toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  alert(`${dateLabel}\n\n`+h.members.map(m=>`${m.displayName}\n  Pushed: ${m.pushed} | Reopened: ${m.reopened} | Queue: ${m.queue} | Aging: ${m.aging} | Overdue: ${m.overdue} | Reopen rate: ${m.reopenRate}%`).join('\n\n'));
+  alert(`${dateLabel}\n\n`+h.members.map(m=>`${m.displayName}\n  Closed: ${m.closed||0} | Sent Back: ${m.sentBack||0} | Backlog: ${m.backlog||0} | QA Stage: ${m.qaStage||0} | QA Prod: ${m.qaProd||0} | Aging: ${m.aging||0} | Overdue: ${m.overdue||0}`).join('\n\n'));
 }
 function clearHistory() {
   if(!confirm('Clear all history? This cannot be undone.')) return;
@@ -1115,29 +1233,25 @@ function clearHistory() {
 function exportCSV() {
   if(!Object.keys(teamData).length){showToast('Fetch data first.');return;}
   const date=document.getElementById('fetch-date').value;
-  const rows=[['Date','Member','Username','Pushed','Reopened','Queue','Aging','Overdue','Reopen Rate %','Critical','High','Medium','Low']];
+  const rows=[['Date','Member','Username','Closed','Moved to Customer','Sent Back to Dev','QA Backlog','QA Stage','QA Production','Aging','Overdue','Critical','High','Medium','Low']];
   teamMembers.forEach(m=>{
     const d=teamData[m.name];
     if(!d) return;
-    rows.push([date,m.displayName,m.name,d.pushed.length,d.reopened.length,d.queue.length,d.aging.length,d.overdue.length,d.reopenRate,d.priorities.critical,d.priorities.high,d.priorities.medium,d.priorities.low]);
+    rows.push([date,m.displayName,m.name,d.closed?.length||0,d.customer?.length||0,d.sentBack?.length||0,d.backlog?.length||0,d.qaStage?.length||0,d.qaProd?.length||0,d.aging?.length||0,d.overdue?.length||0,d.priorities?.critical||0,d.priorities?.high||0,d.priorities?.medium||0,d.priorities?.low||0]);
   });
   // Add detail rows
   rows.push([]);
-  rows.push(['--- Pushed Cases ---']);
+  rows.push(['--- Closed / Pushed Cases ---']);
   rows.push(['Date','Member','Key','Summary','Status','Priority']);
-  teamMembers.forEach(m=>{
-    const d=teamData[m.name];
-    if(!d) return;
-    d.pushed.forEach(i=>rows.push([date,m.displayName,i.key,`"${(i.fields.summary||'').replace(/"/g,'""')}"`,i.fields.status?.name||'',i.fields.priority?.name||'']));
-  });
+  teamMembers.forEach(m=>{const d=teamData[m.name];if(!d)return;(d.closed||[]).forEach(i=>rows.push([date,m.displayName,i.key,`"${(i.fields.summary||'').replace(/"/g,'""')}"`,i.fields.status?.name||'',i.fields.priority?.name||'']));});
   rows.push([]);
-  rows.push(['--- Reopened Cases ---']);
+  rows.push(['--- Sent Back to Dev ---']);
   rows.push(['Date','Member','Key','Summary','Status','Priority']);
-  teamMembers.forEach(m=>{
-    const d=teamData[m.name];
-    if(!d) return;
-    d.reopened.forEach(i=>rows.push([date,m.displayName,i.key,`"${(i.fields.summary||'').replace(/"/g,'""')}"`,i.fields.status?.name||'',i.fields.priority?.name||'']));
-  });
+  teamMembers.forEach(m=>{const d=teamData[m.name];if(!d)return;(d.sentBack||[]).forEach(i=>rows.push([date,m.displayName,i.key,`"${(i.fields.summary||'').replace(/"/g,'""')}"`,i.fields.status?.name||'',i.fields.priority?.name||'']));});
+  rows.push([]);
+  rows.push(['--- QA Stage ---']);
+  rows.push(['Date','Member','Key','Summary','Status','Priority']);
+  teamMembers.forEach(m=>{const d=teamData[m.name];if(!d)return;(d.qaStage||[]).forEach(i=>rows.push([date,m.displayName,i.key,`"${(i.fields.summary||'').replace(/"/g,'""')}"`,i.fields.status?.name||'',i.fields.priority?.name||'']));});
 
   const csv=rows.map(r=>r.join(',')).join('\n');
   const blob=new Blob([csv],{type:'text/csv'});

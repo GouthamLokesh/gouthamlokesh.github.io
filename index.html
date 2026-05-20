@@ -482,7 +482,19 @@ async function jiraReq(path) {
 function buildJql(template, username, date) {
   let jql = template.replace(/currentUser\(\)/g, `"${username}"`);
   const today = getISTToday();
-  if (date && date !== today) jql = jql.replace(/startOfDay\(\)/g, `"${date}"`);
+
+  if (date && date !== today) {
+    // For a custom date, replace "AFTER startOfDay()" with a specific day range
+    // This ensures we get only that day's status changes, not today's
+    // Jira Server: "status CHANGED ... AFTER startOfDay()" → "status CHANGED ... AFTER \"date\" BEFORE \"date+1\""
+    const nextDay = new Date(date + 'T00:00:00');
+    nextDay.setDate(nextDay.getDate() + 1);
+    const nextDateStr = nextDay.toLocaleDateString('en-CA');  // yyyy-MM-dd
+
+    jql = jql.replace(/AFTER startOfDay\(\)/g, `AFTER "${date}" BEFORE "${nextDateStr}"`);
+    jql = jql.replace(/startOfDay\(\)/g, `"${date}"`);
+  }
+
   return jql;
 }
 
@@ -667,8 +679,18 @@ async function fetchAll() {
       const r=await jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(buildJql(jqlPushed||DEFAULT_JQL_PUSHED,m.name,date))}&maxResults=100&fields=summary,status,updated,priority,duedate,project`);
       pushed=r.issues||[];
     } catch(e){console.warn('pushed',m.name,e.message);}
+    // For queue: on a custom date, fetch cases that were in QA on that date
+    // We use updatedDate filter to scope to that day
+    const queueTemplate = jqlQueue || DEFAULT_JQL_QUEUE;
+    let queueJql = queueTemplate.replace(/currentUser\(\)/g, `"${m.name}"`);
+    if (date !== getISTToday()) {
+      const nextDay = new Date(date + 'T00:00:00');
+      nextDay.setDate(nextDay.getDate() + 1);
+      const nextDateStr = nextDay.toLocaleDateString('en-CA');
+      queueJql = queueJql.replace('ORDER BY', `AND updatedDate >= "${date}" AND updatedDate < "${nextDateStr}" ORDER BY`);
+    }
     try {
-      const r=await jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(buildJql(jqlQueue||DEFAULT_JQL_QUEUE,m.name,date))}&maxResults=100&fields=summary,status,updated,priority,duedate,project`);
+      const r=await jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(queueJql)}&maxResults=100&fields=summary,status,updated,priority,duedate,project`);
       queue=r.issues||[];
     } catch(e){console.warn('queue',m.name,e.message);}
 

@@ -445,7 +445,7 @@ input[type="date"]:focus{border-color:var(--accent)}
 
 const DEFAULT_JQL_SENT_BACK = `(status CHANGED FROM "QA STAGE" TO "DEV STAGE" BY currentUser() AFTER startOfDay() OR status CHANGED FROM "QA PRODUCTION" TO "DEV PRODUCTION" BY currentUser() AFTER startOfDay()) ORDER BY updated DESC`;
 
-const DEFAULT_JQL_PUSHED = `status CHANGED TO "Complete" BY currentUser() AFTER startOfDay() AND status = "Complete" ORDER BY updated DESC`;
+const DEFAULT_JQL_PUSHED = `assignee = currentUser() AND status = "Complete" AND updatedDate >= startOfDay() AND updatedDate <= endOfDay() ORDER BY updatedDate DESC`;
 
 const DEFAULT_JQL_CUSTOMER = `(status CHANGED FROM "QA STAGE" TO "APPROVAL STAGE" BY currentUser() AFTER startOfDay() OR status CHANGED FROM "QA PRODUCTION" TO "APPROVAL PRODUCTION" BY currentUser() AFTER startOfDay()) AND status in ("APPROVAL STAGE","APPROVAL PRODUCTION") ORDER BY updated DESC`;
 
@@ -473,7 +473,9 @@ window.onload = () => {
   proxyUrl   = localStorage.getItem('qa_proxy') || '';
   jiraUrl    = localStorage.getItem('qa_jira_url') || 'https://jdac.unilogcorp.com';
   jqlSentBack = localStorage.getItem('qa_jql_sentback')  || DEFAULT_JQL_SENT_BACK;
-  jqlPushed   = localStorage.getItem('qa_jql_pushed')    || DEFAULT_JQL_PUSHED;
+  // Always reset closed JQL to latest default (in case of old saved value)
+  localStorage.removeItem('qa_jql_pushed');
+  jqlPushed   = DEFAULT_JQL_PUSHED;
   jqlCustomer = localStorage.getItem('qa_jql_customer')  || DEFAULT_JQL_CUSTOMER;
   jqlBacklog  = localStorage.getItem('qa_jql_backlog')   || DEFAULT_JQL_BACKLOG;
   jqlQaStage  = localStorage.getItem('qa_jql_qastage')   || DEFAULT_JQL_QA_STAGE;
@@ -520,16 +522,20 @@ async function jiraReq(path) {
   return r.json();
 }
 function buildJql(template, username, date) {
-  // Replace currentUser() with actual username
   let jql = template.replace(/currentUser\(\)/g, `"${username}"`);
 
   const today = getISTToday();
 
   if (date && date !== today) {
-    // Past date: replace "AFTER startOfDay()" with "ON \"date\""
-    // The AND status = "Complete" filter stays as-is — it filters by current status
+    const nextDay = new Date(date + 'T00:00:00');
+    nextDay.setDate(nextDay.getDate() + 1);
+    const nextDateStr = nextDay.toLocaleDateString('en-CA');
+
     jql = jql.replace(/AFTER\s+startOfDay\(\)/gi, `ON "${date}"`);
+    jql = jql.replace(/>=\s*startOfDay\(\)/gi, `>= "${date}"`);
+    jql = jql.replace(/<=\s*endOfDay\(\)/gi,   `< "${nextDateStr}"`);
     jql = jql.replace(/startOfDay\(\)/gi, `"${date}"`);
+    jql = jql.replace(/endOfDay\(\)/gi,   `"${date} 23:59"`);
   }
 
   console.log(`[JQL] ${username} | ${date} |\n${jql}\n`);

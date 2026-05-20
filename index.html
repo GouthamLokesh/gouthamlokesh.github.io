@@ -384,7 +384,7 @@ input[type="date"]:focus{border-color:var(--accent)}
         <textarea class="s-input s-jql" id="s-jql-sentback" rows="3"></textarea>
       </div>
       <div class="s-field">
-        <label class="s-label">Closed Cases (QA Stage → Complete, QA Production → Complete, Approval Stage → Complete, Approval Production → Complete)</label>
+        <label class="s-label">Closed Cases (any case moved TO Complete on the selected day)</label>
         <textarea class="s-input s-jql" id="s-jql-pushed" rows="3"></textarea>
       </div>
       <div class="s-field">
@@ -445,7 +445,7 @@ input[type="date"]:focus{border-color:var(--accent)}
 
 const DEFAULT_JQL_SENT_BACK = `(status CHANGED FROM "QA STAGE" TO "DEV STAGE" BY currentUser() AFTER startOfDay() OR status CHANGED FROM "QA PRODUCTION" TO "DEV PRODUCTION" BY currentUser() AFTER startOfDay()) ORDER BY updated DESC`;
 
-const DEFAULT_JQL_PUSHED = `(status CHANGED FROM "QA STAGE" TO "COMPLETE" BY currentUser() AFTER startOfDay() OR status CHANGED FROM "QA PRODUCTION" TO "COMPLETE" BY currentUser() AFTER startOfDay() OR status CHANGED FROM "APPROVAL STAGE" TO "COMPLETE" BY currentUser() AFTER startOfDay() OR status CHANGED FROM "APPROVAL PRODUCTION" TO "COMPLETE" BY currentUser() AFTER startOfDay()) ORDER BY updated DESC`;
+const DEFAULT_JQL_PUSHED = `status CHANGED TO "Complete" BY currentUser() AFTER startOfDay() AND status = "Complete" ORDER BY updated DESC`;
 
 const DEFAULT_JQL_CUSTOMER = `(status CHANGED FROM "QA STAGE" TO "APPROVAL STAGE" BY currentUser() AFTER startOfDay() OR status CHANGED FROM "QA PRODUCTION" TO "APPROVAL PRODUCTION" BY currentUser() AFTER startOfDay()) AND status in ("APPROVAL STAGE","APPROVAL PRODUCTION") ORDER BY updated DESC`;
 
@@ -520,20 +520,18 @@ async function jiraReq(path) {
   return r.json();
 }
 function buildJql(template, username, date) {
-  // Step 1: replace currentUser() with actual username
+  // Replace currentUser() with actual username
   let jql = template.replace(/currentUser\(\)/g, `"${username}"`);
 
   const today = getISTToday();
 
   if (date && date !== today) {
     // Past date: replace "AFTER startOfDay()" with "ON \"date\""
-    // Jira Server "status CHANGED ... ON \"date\"" returns changes that happened on that exact date
+    // The AND status = "Complete" filter stays as-is — it filters by current status
     jql = jql.replace(/AFTER\s+startOfDay\(\)/gi, `ON "${date}"`);
-    // Catch any remaining startOfDay() references
     jql = jql.replace(/startOfDay\(\)/gi, `"${date}"`);
   }
 
-  // Log so you can verify in browser console (F12 → Console)
   console.log(`[JQL] ${username} | ${date} |\n${jql}\n`);
   return jql;
 }

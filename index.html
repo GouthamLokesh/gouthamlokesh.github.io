@@ -445,9 +445,9 @@ input[type="date"]:focus{border-color:var(--accent)}
 
 const DEFAULT_JQL_SENT_BACK = `(status CHANGED FROM "QA STAGE" TO "DEV STAGE" BY currentUser() AFTER startOfDay() OR status CHANGED FROM "QA PRODUCTION" TO "DEV PRODUCTION" BY currentUser() AFTER startOfDay()) ORDER BY updated DESC`;
 
-const DEFAULT_JQL_PUSHED = `(status CHANGED FROM "QA STAGE" TO "COMPLETE" BY currentUser() AFTER startOfDay() OR status CHANGED FROM "QA PRODUCTION" TO "COMPLETE" BY currentUser() AFTER startOfDay() OR status CHANGED FROM "APPROVAL STAGE" TO "COMPLETE" BY currentUser() AFTER startOfDay() OR status CHANGED FROM "APPROVAL PRODUCTION" TO "COMPLETE" BY currentUser() AFTER startOfDay()) ORDER BY updated DESC`;
+const DEFAULT_JQL_PUSHED = `(status CHANGED FROM "QA STAGE" TO "COMPLETE" BY currentUser() AFTER startOfDay() OR status CHANGED FROM "QA PRODUCTION" TO "COMPLETE" BY currentUser() AFTER startOfDay() OR status CHANGED FROM "APPROVAL STAGE" TO "COMPLETE" BY currentUser() AFTER startOfDay() OR status CHANGED FROM "APPROVAL PRODUCTION" TO "COMPLETE" BY currentUser() AFTER startOfDay()) AND status = "COMPLETE" ORDER BY updated DESC`;
 
-const DEFAULT_JQL_CUSTOMER = `(status CHANGED FROM "QA STAGE" TO "APPROVAL STAGE" BY currentUser() AFTER startOfDay() OR status CHANGED FROM "QA PRODUCTION" TO "APPROVAL PRODUCTION" BY currentUser() AFTER startOfDay()) ORDER BY updated DESC`;
+const DEFAULT_JQL_CUSTOMER = `(status CHANGED FROM "QA STAGE" TO "APPROVAL STAGE" BY currentUser() AFTER startOfDay() OR status CHANGED FROM "QA PRODUCTION" TO "APPROVAL PRODUCTION" BY currentUser() AFTER startOfDay()) AND status in ("APPROVAL STAGE","APPROVAL PRODUCTION") ORDER BY updated DESC`;
 
 const DEFAULT_JQL_BACKLOG = `assignee = currentUser() AND status = "QA QUEUE" ORDER BY priority DESC, updated ASC`;
 
@@ -725,10 +725,13 @@ async function fetchAll() {
       sentBack=r.issues||[];
     } catch(e){console.warn('sentBack',m.name,e.message);}
 
-    // 2. Closed Cases
+    // 2. Closed Cases — direct transitions to Complete
     try {
-      const r=await jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(buildJql(jqlPushed||DEFAULT_JQL_PUSHED,m.name,date))}&maxResults=100&fields=summary,status,updated,priority,duedate,project`);
+      const jqlBuilt = buildJql(jqlPushed||DEFAULT_JQL_PUSHED, m.name, date);
+      console.log(`[CLOSED JQL] ${m.name}:\n${jqlBuilt}`);
+      const r=await jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(jqlBuilt)}&maxResults=100&fields=summary,status,updated,priority,duedate,project`);
       closed=r.issues||[];
+      console.log(`[CLOSED] ${m.name}: ${closed.length} cases`, closed.map(i=>i.key+' '+i.fields.status?.name));
     } catch(e){console.warn('closed',m.name,e.message);}
 
     // 3. Cases Moved to Customer

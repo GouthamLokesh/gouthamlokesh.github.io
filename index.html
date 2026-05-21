@@ -742,24 +742,29 @@ async function fetchAll() {
       sentBack=r.issues||[];
     } catch(e){console.warn('sentBack',m.name,e.message);}
 
-    // 2. Closed Cases — fetch all Complete cases assigned to member, then filter
-    // by checking changelog for status change to Complete on the target date
-    // This works regardless of Jira Server version
+    // 2. Closed Cases — fetch all Complete cases, filter by changelog date
     try {
       const jqlBuilt = `assignee = "${m.name}" AND status = "Complete" ORDER BY updated DESC`;
       console.log(`[CLOSED JQL] ${m.name}:\n${jqlBuilt}`);
       const r = await jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(jqlBuilt)}&maxResults=200&fields=summary,status,updated,priority,duedate,project&expand=changelog`);
       const allComplete = r.issues || [];
 
-      // Filter: only keep cases where status changed TO Complete on the target date
-      const targetDateStr = (date || getISTToday());
+      const targetDateStr = date || getISTToday();
+
       closed = allComplete.filter(issue => {
         const histories = issue.changelog?.histories || [];
         return histories.some(h => {
-          // Check if this history entry is on the target date
-          const histDate = h.created ? h.created.substring(0, 10) : '';
-          if (histDate !== targetDateStr) return false;
-          // Check if any item in this history changed status to Complete
+          if (!h.created) return false;
+          // Convert changelog timestamp to IST date string
+          // Jira timestamps include timezone e.g. "2026-05-18T17:39:00.000+0530"
+          // new Date() parses the timezone correctly, then we extract IST date
+          const createdDate = new Date(h.created);
+          // Format in IST timezone
+          const histDateIST = createdDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+
+          console.log(`[CHANGELOG] ${issue.key} | created: ${h.created} | IST date: ${histDateIST} | target: ${targetDateStr}`);
+
+          if (histDateIST !== targetDateStr) return false;
           return (h.items || []).some(item =>
             item.field === 'status' &&
             (item.toString || '').toLowerCase() === 'complete'

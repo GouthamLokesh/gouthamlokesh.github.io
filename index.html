@@ -416,27 +416,27 @@ input[type="date"]:focus{border-color:var(--accent)}
     </div>
 
     <div class="settings-card">
-      <div class="s-title">🤖 Groq AI Integration (Free)</div>
-      <div class="info-box">Groq runs Llama 3 — completely free, ultra fast. Automatically generates Key Updates, Plans for Tomorrow, insights and risk alerts from your Jira data.</div>
+      <div class="s-title">🤖 Google Gemini AI (Free)</div>
+      <div class="info-box">Gemini 2.0 Flash — Google's fastest free AI model. Automatically generates Key Updates, Plans for Tomorrow, insights and risk alerts from your Jira data.</div>
       <div class="s-field">
-        <label class="s-label">Groq API Key</label>
+        <label class="s-label">Gemini API Key</label>
         <div class="pat-row">
-          <input type="password" id="s-groq-key" class="s-input" placeholder="gsk_..." autocomplete="off"/>
-          <button class="btn btn-primary" onclick="testGroqKey()">Test</button>
+          <input type="password" id="s-gemini-key" class="s-input" placeholder="AIza..." autocomplete="off"/>
+          <button class="btn btn-primary" onclick="testGeminiKey()">Test</button>
         </div>
-        <div class="s-hint">Get free key at <a href="https://console.groq.com" target="_blank">console.groq.com</a> → API Keys → Create API Key. No credit card needed!</div>
+        <div class="s-hint">Get free key at <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a> → Create API Key. No credit card needed!</div>
       </div>
       <div class="conn-result" id="ai-result"></div>
       <div class="s-field" style="margin-top:10px">
         <label class="s-label">Auto-generate after fetch</label>
         <div style="display:flex;align-items:center;gap:10px;margin-top:6px">
-          <input type="checkbox" id="s-groq-auto" style="width:auto;accent-color:var(--accent)"/>
+          <input type="checkbox" id="s-gemini-auto" style="width:auto;accent-color:var(--accent)"/>
           <span style="font-size:13px;color:var(--text)">Automatically run AI for all members after each fetch</span>
         </div>
       </div>
       <button class="btn btn-primary" style="margin-top:10px" onclick="saveSettings()">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-        Save Groq Settings
+        Save Gemini Settings
       </button>
     </div>
 
@@ -488,7 +488,7 @@ const DEFAULT_JQL_QUEUE = `assignee = currentUser() AND status in ("QA QUEUE","Q
 let pat='', proxyUrl='', jiraUrl='', connectedUser=null;
 let teamMembers=[], teamData={};
 let jqlSentBack='', jqlPushed='', jqlCustomer='', jqlBacklog='', jqlQaStage='', jqlQaProd='', jqlQueue='', agingDays=3;
-let groqKey='', groqAuto=false;
+let geminiKey='', geminiAuto=false;
 let trendChart=null;
 
 // ── Init ───────────────────────────────────────────────────────────
@@ -525,10 +525,16 @@ window.onload = () => {
   document.getElementById('s-aging').value = agingDays;
 
   // OpenAI init
-  groqKey  = localStorage.getItem('qa_groq_key') || '';
-  groqAuto = localStorage.getItem('qa_groq_auto') === 'true';
-  document.getElementById('s-groq-key').value   = groqKey ? '••••••••••••••••' : '';
-  document.getElementById('s-groq-auto').checked = groqAuto;
+  // Clear old AI keys from previous versions
+  localStorage.removeItem('qa_groq_key');
+  localStorage.removeItem('qa_groq_auto');
+  localStorage.removeItem('qa_openai_key');
+  localStorage.removeItem('qa_openai_auto');
+
+  geminiKey  = localStorage.getItem('qa_gemini_key') || '';
+  geminiAuto = localStorage.getItem('qa_gemini_auto') === 'true';
+  document.getElementById('s-gemini-key').value   = geminiKey ? '••••••••••••••••' : '';
+  document.getElementById('s-gemini-auto').checked = geminiAuto;
 
   renderMemberList();
   renderHistoryList();
@@ -711,10 +717,10 @@ function saveSettings() {
   localStorage.setItem('qa_proxy',        proxyUrl);
   localStorage.setItem('qa_jira_url',     jiraUrl);
   // OpenAI settings
-  const inputGroqKey = document.getElementById('s-groq-key').value.trim();
-  if (inputGroqKey && !inputGroqKey.includes('•')) { groqKey = inputGroqKey; localStorage.setItem('qa_groq_key', groqKey); }
-  groqAuto = document.getElementById('s-groq-auto').checked;
-  localStorage.setItem('qa_groq_auto', groqAuto);
+  const inputGeminiKey = document.getElementById('s-gemini-key').value.trim();
+  if (inputGeminiKey && !inputGeminiKey.includes('•')) { geminiKey = inputGeminiKey; localStorage.setItem('qa_gemini_key', geminiKey); }
+  geminiAuto = document.getElementById('s-gemini-auto').checked;
+  localStorage.setItem('qa_gemini_auto', geminiAuto);
   showToast('✅ Settings saved!');
 }
 
@@ -855,7 +861,7 @@ async function fetchAll() {
   document.getElementById('fetch-btn').disabled=false;
 
   // Auto-generate AI if enabled
-  if (groqAuto && groqKey) {
+  if (geminiAuto && geminiKey) {
     showToast('🤖 Auto-generating AI insights...');
     setTimeout(() => generateAIForAll(), 800);
   }
@@ -1104,16 +1110,16 @@ ${qaProdList}
 function cpTA(id,btn){const el=document.getElementById(id);if(!el)return;navigator.clipboard.writeText(el.value).then(()=>flash(btn));}
 function cpRO(id,btn){const el=document.getElementById(id);if(!el)return;navigator.clipboard.writeText(el.innerText).then(()=>flash(btn));}
 function flash(btn){if(!btn)return;const o=btn.innerHTML;btn.innerHTML='✓';btn.classList.add('copied');setTimeout(()=>{btn.innerHTML=o;btn.classList.remove('copied');},1500);}
-// ── Groq AI / Claude via Worker ──────────────────────────────────
-async function testGroqKey() {
-  const inputKey = document.getElementById('s-groq-key').value.trim();
+// ── Gemini AI / Claude via Worker ────────────────────────────────
+async function testGeminiKey() {
+  const inputKey = document.getElementById('s-gemini-key').value.trim();
   if (!inputKey || inputKey.includes('•')) { showAIResult('⚠ Enter a valid API key.','err'); return; }
-  groqKey = inputKey;
+  geminiKey = inputKey;
   showAIResult('Testing...','');
   try {
-    const resp = await callGroq('Say "Connected!" in 2 words.');
-    showAIResult(`✅ Groq connected! Response: ${resp}`,'ok');
-    localStorage.setItem('qa_groq_key', groqKey);
+    const resp = await callGemini('Say "Connected!" in 2 words.');
+    showAIResult(`✅ Gemini connected! Response: ${resp}`,'ok');
+    localStorage.setItem('qa_gemini_key', geminiKey);
   } catch(e) { showAIResult(`❌ ${e.message}`,'err'); }
 }
 
@@ -1122,20 +1128,19 @@ function showAIResult(msg, type) {
   if (el) { el.textContent = msg; el.className = 'conn-result ' + type; }
 }
 
-async function callGroq(prompt, systemPrompt='You are a QA team assistant. Be concise and professional.') {
-  if (!groqKey) throw new Error('No Groq API key. Add it in Settings.');
-  const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+async function callGemini(prompt, systemPrompt='You are a QA team assistant. Be concise and professional.') {
+  if (!geminiKey) throw new Error('No Gemini API key. Add it in Settings.');
+  const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${groqKey}` },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'llama3-8b-8192',
-      max_tokens: 500,
-      messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: prompt }]
+      contents: [{ parts: [{ text: systemPrompt + '\n\n' + prompt }] }],
+      generationConfig: { maxOutputTokens: 500 }
     })
   });
-  if (!resp.ok) { const t = await resp.text(); throw new Error(`Groq API ${resp.status}: ${t.slice(0,200)}`); }
+  if (!resp.ok) { const t = await resp.text(); throw new Error(`Gemini API ${resp.status}: ${t.slice(0,200)}`); }
   const data = await resp.json();
-  return data.choices?.[0]?.message?.content || '';
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
 }
 
 // Call Claude via Cloudflare Worker (no API key needed in browser)
@@ -1154,9 +1159,9 @@ async function generateViaWorker(allMemberData, date) {
 
 async function generateAIForMember(mid, memberName, d, date) {
   const hasWorker = !!proxyUrl;
-  const hasGroq = !!groqKey;
-  if (!hasWorker && !hasGroq) {
-    showToast('⚠ Add Groq API key in Settings, or set up Cloudflare Worker with ANTHROPIC_KEY secret.');
+  const hasGemini = !!geminiKey;
+  if (!hasWorker && !hasGemini) {
+    showToast('⚠ Add Gemini API key in Settings, or set up Cloudflare Worker with ANTHROPIC_KEY secret.');
     return;
   }
   const btn = document.querySelector(`[onclick="generateAIForMember('${mid}','${memberName.replace(/'/g,"\'")}')"]`);
@@ -1172,10 +1177,10 @@ async function generateAIForMember(mid, memberName, d, date) {
     } else {
       const context = buildContextLocal(d, date);
       [keyUpdates, plans, comments, risks] = await Promise.all([
-        callGroq(`Write Key Updates summary (3-5 bullet points starting with •):\n${context}`),
-        callGroq(`Suggest Plans for Tomorrow (3-4 bullet points starting with •):\n${context}`),
-        callGroq(`Write Additional Comments (2-3 sentences) about workload and blockers:\n${context}`),
-        callGroq(`Identify risks or concerns (2-3 sentences):\n${context}`)
+        callGemini(`Write Key Updates summary (3-5 bullet points starting with •):\n${context}`),
+        callGemini(`Suggest Plans for Tomorrow (3-4 bullet points starting with •):\n${context}`),
+        callGemini(`Write Additional Comments (2-3 sentences) about workload and blockers:\n${context}`),
+        callGemini(`Identify risks or concerns (2-3 sentences):\n${context}`)
       ]);
     }
     const kuEl = document.getElementById(`${mid}-ku`);
@@ -1211,8 +1216,8 @@ Aging: ${d.aging?.map(i=>i.key).join(',')||'None'} | Overdue: ${d.overdue?.map(i
 }
 
 async function generateAIForAll() {
-  if (!proxyUrl && !groqKey) {
-    showToast('⚠ Add Groq API key in Settings, or set up Cloudflare Worker with ANTHROPIC_KEY.');
+  if (!proxyUrl && !geminiKey) {
+    showToast('⚠ Add Gemini API key in Settings, or set up Cloudflare Worker with ANTHROPIC_KEY.');
     return;
   }
   if (!Object.keys(teamData).length) { showToast('Fetch team data first.'); return; }

@@ -530,35 +530,22 @@ function buildJql(template, username, date) {
   const today = getISTToday();
   const targetDate = date || today;
 
-  // Convert IST day to UTC boundaries (Jira server is UTC, IST = UTC+5:30)
-  const istStart = new Date(targetDate + 'T00:00:00+05:30');
-  const istEnd   = new Date(targetDate + 'T23:59:59+05:30');
+  // Jira server is IST — send dates directly as IST strings
+  const startIST = `"${targetDate} 00:00"`;
+  const endIST   = `"${targetDate} 23:59"`;
 
-  function fmtUTC(d) {
-    const yy = d.getUTCFullYear();
-    const mm = String(d.getUTCMonth()+1).padStart(2,'0');
-    const dd = String(d.getUTCDate()).padStart(2,'0');
-    const hh = String(d.getUTCHours()).padStart(2,'0');
-    const mi = String(d.getUTCMinutes()).padStart(2,'0');
-    return `${yy}-${mm}-${dd} ${hh}:${mi}`;
-  }
+  // For updatedDate comparisons (closed cases)
+  jql = jql.replace(/>=\s*startOfDay\(\)/gi,    `>= ${startIST}`);
+  jql = jql.replace(/<=\s*endOfDay\(\)/gi,       `<= ${endIST}`);
 
-  const startUTC = `"${fmtUTC(istStart)}"`;
-  const endUTC   = `"${fmtUTC(istEnd)}"`;
-
-  // For updatedDate comparisons (closed cases JQL)
-  jql = jql.replace(/>=\s*startOfDay\(\)/gi, `>= ${startUTC}`);
-  jql = jql.replace(/<=\s*endOfDay\(\)/gi,   `<= ${endUTC}`);
-
-  // For status CHANGED ... AFTER startOfDay() (sent back, customer JQL)
-  // Use "AFTER startUTC BEFORE endUTC" to scope to exact IST day
-  jql = jql.replace(/AFTER\s+startOfDay\(\)/gi, `AFTER ${startUTC} BEFORE ${endUTC}`);
+  // For status CHANGED ... AFTER startOfDay() (sent back, customer)
+  jql = jql.replace(/AFTER\s+startOfDay\(\)/gi,  `AFTER ${startIST} BEFORE ${endIST}`);
 
   // Catch any remaining
-  jql = jql.replace(/startOfDay\(\)/gi, startUTC);
-  jql = jql.replace(/endOfDay\(\)/gi,   endUTC);
+  jql = jql.replace(/startOfDay\(\)/gi, startIST);
+  jql = jql.replace(/endOfDay\(\)/gi,   endIST);
 
-  console.log(`[JQL] ${username} | ${targetDate} | UTC: ${fmtUTC(istStart)} → ${fmtUTC(istEnd)}\n${jql}\n`);
+  console.log(`[JQL] ${username} | ${targetDate} |\n${jql}\n`);
   return jql;
 }
 

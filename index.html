@@ -416,7 +416,6 @@ input[type="date"]:focus{border-color:var(--accent)}
     </div>
 
     <div class="settings-card">
-      <div class="s-title">Team Members</div>
       <div class="info-box">Enter email (<code>Goutham.L@unilogcorp.com</code>) or username (<code>Goutham.L</code>) — email domain is stripped automatically.</div>
       <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
         <input type="text" id="m-user" class="s-input" placeholder="Email or username" style="flex:1;min-width:160px"/>
@@ -660,7 +659,6 @@ function showConnResult(m,t) {
 
 // ── Settings ───────────────────────────────────────────────────────
 function saveSettings() {
-  jqlSentBack = document.getElementById('s-jql-sentback').value.trim();
   jqlPushed   = document.getElementById('s-jql-pushed').value.trim();
   jqlCustomer = document.getElementById('s-jql-customer').value.trim();
   jqlBacklog  = document.getElementById('s-jql-backlog').value.trim();
@@ -828,6 +826,7 @@ async function fetchAll() {
   renderTabs(date);
   saveToHistory(date);
   document.getElementById('fetch-btn').disabled=false;
+
 }
 
 // ── Team Overview ──────────────────────────────────────────────────
@@ -1001,9 +1000,11 @@ ${qaProdList}
   ${qaProd.length?`<div style="font-family:var(--mono);font-size:10px;color:var(--info);margin:12px 0 6px;letter-spacing:0.5px">🟣 QA PRODUCTION (${qaProd.length})</div>
   <div class="tbl-wrap"><table><thead><tr><th>Key</th><th>Summary</th><th>Priority</th><th>Flags</th><th>Due</th></tr></thead><tbody>${mkQueueRows(qaProd)}</tbody></table></div>`:''}
 
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-top:18px;margin-bottom:10px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:18px;margin-bottom:10px">
     <div style="font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:1px">📋 TEAMS FORM — ${m.displayName.split(' ')[0].toUpperCase()}</div>
-    <button class="btn btn-success btn-sm" onclick="copyAll('${mid}','${m.displayName.replace(/'/g,"\\'")}')">Copy All Fields</button>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-success btn-sm" onclick="copyAll('${mid}','${m.displayName.replace(/'/g,"\\'")}')">Copy All Fields</button>
+    </div>
   </div>
 
   <div class="form-body">
@@ -1071,6 +1072,125 @@ ${qaProdList}
 function cpTA(id,btn){const el=document.getElementById(id);if(!el)return;navigator.clipboard.writeText(el.value).then(()=>flash(btn));}
 function cpRO(id,btn){const el=document.getElementById(id);if(!el)return;navigator.clipboard.writeText(el.innerText).then(()=>flash(btn));}
 function flash(btn){if(!btn)return;const o=btn.innerHTML;btn.innerHTML='✓';btn.classList.add('copied');setTimeout(()=>{btn.innerHTML=o;btn.classList.remove('copied');},1500);}
+// ── Claude AI ─────────────────────────────────────────────────────
+async function testClaudeKey() {
+  const inputKey = document.getElementById('s-claude-key').value.trim();
+  if (!inputKey || inputKey.includes('•')) { showClaudeResult('⚠ Enter a valid API key.','err'); return; }
+  claudeKey = inputKey;
+  showClaudeResult('Testing...','');
+  try {
+    const resp = await callClaude('Say "Connected!" in 2 words.');
+    showClaudeResult(`✅ Claude connected! Response: ${resp}`,'ok');
+    localStorage.setItem('qa_claude_key', claudeKey);
+  } catch(e) { showClaudeResult(`❌ ${e.message}`,'err'); }
+}
+
+function showClaudeResult(msg, type) {
+  const el = document.getElementById('claude-result');
+  el.textContent = msg;
+  el.className = 'conn-result ' + type;
+}
+
+async function callClaude(prompt, systemPrompt='You are a QA team assistant. Be concise and professional.') {
+  if (!claudeKey) throw new Error('No Claude API key. Add it in Settings.');
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': claudeKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1000,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  });
+  if (!resp.ok) { const t = await resp.text(); throw new Error(`Claude API ${resp.status}: ${t.slice(0,200)}`); }
+  const data = await resp.json();
+  return data.content?.[0]?.text || '';
+}
+
+async function generateAIForMember(mid, memberName, d, date) {
+  if (!claudeKey) {
+    showToast('⚠ Add Claude API key in Settings first. Sign up at console.anthropic.com with your personal Gmail.');
+    return;
+  }
+
+  const btn = document.querySelector(`[onclick="generateAIForMember('${mid}','${memberName.replace(/'/g,"\\'")}')"]`);
+  if (btn) { btn.textContent = '⏳ Generating...'; btn.disabled = true; }
+
+  try {
+    const { closed, customer, sentBack, backlog, qaStage, qaProd, aging, overdue } = d;
+
+    const context = `
+QA Engineer: ${memberName}
+Date: ${date}
+
+CLOSED CASES (${closed.length}): ${closed.map(i=>`${i.key}: ${i.fields.summary}`).join('; ') || 'None'}
+CASES MOVED TO CUSTOMER (${customer.length}): ${customer.map(i=>`${i.key}: ${i.fields.summary}`).join('; ') || 'None'}
+SENT BACK TO DEV (${sentBack.length}): ${sentBack.map(i=>`${i.key}: ${i.fields.summary}`).join('; ') || 'None'}
+QA BACKLOG (${backlog.length}): ${backlog.map(i=>`${i.key}: ${i.fields.summary}`).join('; ') || 'None'}
+QA STAGE - WORKING (${qaStage.length}): ${qaStage.map(i=>`${i.key}: ${i.fields.summary}`).join('; ') || 'None'}
+QA PRODUCTION (${qaProd.length}): ${qaProd.map(i=>`${i.key}: ${i.fields.summary}`).join('; ') || 'None'}
+AGING CASES (${aging.length}): ${aging.map(i=>i.key).join(', ') || 'None'}
+OVERDUE CASES (${overdue.length}): ${overdue.map(i=>i.key).join(', ') || 'None'}`;
+
+    const [keyUpdates, plans, comments, risks] = await Promise.all([
+      callClaude(`Based on this QA engineer's daily work data, write a professional Key Updates summary (3-5 bullet points, start each with •):\n${context}`),
+      callClaude(`Based on this QA engineer's current backlog and active cases, suggest Plans for Tomorrow (3-4 bullet points, start each with •):\n${context}`),
+      callClaude(`Write a brief Additional Comments section (2-3 sentences) mentioning workload, risks, and any blockers:\n${context}`),
+      callClaude(`Identify any risks or concerns from this QA data. Be brief (2-3 sentences):\n${context}`)
+    ]);
+
+    // Update form fields
+    const kuEl = document.getElementById(`${mid}-ku`);
+    const plEl = document.getElementById(`${mid}-pl`);
+    const cmEl = document.getElementById(`${mid}-cm`);
+    if (kuEl) kuEl.value = keyUpdates;
+    if (plEl) plEl.value = plans;
+    if (cmEl) cmEl.value = comments;
+
+    // Add AI insights section
+    let insightEl = document.getElementById(`${mid}-ai-insights`);
+    if (!insightEl) {
+      insightEl = document.createElement('div');
+      insightEl.id = `${mid}-ai-insights`;
+      insightEl.style.cssText = 'background:rgba(124,92,191,0.08);border:1px solid rgba(124,92,191,0.3);border-radius:10px;padding:14px;margin-top:12px';
+      const formBody = document.getElementById(`${mid}-ku`)?.closest('.form-body');
+      if (formBody) formBody.parentNode.insertBefore(insightEl, formBody);
+    }
+    insightEl.innerHTML = `
+      <div style="font-family:var(--mono);font-size:10px;color:var(--accent2);letter-spacing:1px;margin-bottom:10px">🤖 AI INSIGHTS — ${memberName}</div>
+      <div style="font-size:12px;color:var(--text);line-height:1.7;white-space:pre-wrap">${risks}</div>`;
+
+    showToast(`✅ AI generated for ${memberName}!`);
+  } catch(e) {
+    showToast(`❌ Claude error: ${e.message}`);
+  } finally {
+    if (btn) { btn.textContent = '🤖 Generate AI'; btn.disabled = false; }
+  }
+}
+
+async function generateAIForAll() {
+  if (!claudeKey) { showToast('⚠ Add Claude API key in Settings first.'); return; }
+  if (!Object.keys(teamData).length) { showToast('Fetch team data first.'); return; }
+  showToast('🤖 Generating AI for all members...');
+  const date = document.getElementById('fetch-date').value;
+  for (let i = 0; i < teamMembers.length; i++) {
+    const m = teamMembers[i];
+    const d = teamData[m.name];
+    if (d) await generateAIForMember(`m${i}`, m.displayName, d, date);
+  }
+  showToast('✅ AI generated for all members!');
+}
+
+function renderAIButton(mid, memberName) {
+  return `<button class="btn btn-sm" style="background:linear-gradient(135deg,var(--accent),var(--accent2));color:white;border:none" onclick="generateAIForMember('${mid}','${memberName.replace(/'/g,"\\'")}')">🤖 Generate AI</button>`;
+}
+// ── End Claude AI ──────────────────────────────────────────────────
+
 function copyAll(mid,name){
   const get = (id,ta) => { const el=document.getElementById(id); return el?(ta?el.value:el.innerText):''; };
   const txt=`=== ${name} ===

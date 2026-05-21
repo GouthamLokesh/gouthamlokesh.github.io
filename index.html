@@ -446,7 +446,7 @@ input[type="date"]:focus{border-color:var(--accent)}
 
 const DEFAULT_JQL_SENT_BACK = `(status CHANGED FROM "QA STAGE" TO "DEV STAGE" BY currentUser() AFTER startOfDay() OR status CHANGED FROM "QA PRODUCTION" TO "DEV PRODUCTION" BY currentUser() AFTER startOfDay()) ORDER BY updated DESC`;
 
-const DEFAULT_JQL_PUSHED = `assignee = currentUser() AND status = "Complete" AND updatedDate >= startOfDay() AND updatedDate <= endOfDay() ORDER BY updatedDate DESC`;
+const DEFAULT_JQL_PUSHED = `status CHANGED TO "Complete" BY currentUser() AFTER startOfDay() AND status = "Complete" ORDER BY updated DESC`;
 
 const DEFAULT_JQL_CUSTOMER = `(status CHANGED FROM "QA STAGE" TO "APPROVAL STAGE" BY currentUser() AFTER startOfDay() OR status CHANGED FROM "QA PRODUCTION" TO "APPROVAL PRODUCTION" BY currentUser() AFTER startOfDay()) AND status in ("APPROVAL STAGE","APPROVAL PRODUCTION") ORDER BY updated DESC`;
 
@@ -476,9 +476,9 @@ window.onload = () => {
   proxyUrl   = localStorage.getItem('qa_proxy') || '';
   jiraUrl    = localStorage.getItem('qa_jira_url') || 'https://jdac.unilogcorp.com';
   jqlSentBack = localStorage.getItem('qa_jql_sentback')  || DEFAULT_JQL_SENT_BACK;
-  // Always reset closed JQL to latest default (in case of old saved value)
+  // Always reset closed JQL to latest default
   localStorage.removeItem('qa_jql_pushed');
-  jqlPushed   = DEFAULT_JQL_PUSHED;
+  jqlPushed = DEFAULT_JQL_PUSHED;
   jqlCustomer = localStorage.getItem('qa_jql_customer')  || DEFAULT_JQL_CUSTOMER;
   jqlBacklog  = localStorage.getItem('qa_jql_backlog')   || DEFAULT_JQL_BACKLOG;
   jqlQaStage  = localStorage.getItem('qa_jql_qastage')   || DEFAULT_JQL_QA_STAGE;

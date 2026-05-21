@@ -530,14 +530,10 @@ function buildJql(template, username, date) {
   const today = getISTToday();
   const targetDate = date || today;
 
-  // Jira server is UTC. IST = UTC+5:30.
-  // To query a full IST day, convert IST midnight boundaries to UTC:
-  // IST 00:00 = UTC prev-day 18:30
-  // IST 23:59 = UTC same-day 18:29
+  // Convert IST day to UTC boundaries (Jira server is UTC, IST = UTC+5:30)
   const istStart = new Date(targetDate + 'T00:00:00+05:30');
   const istEnd   = new Date(targetDate + 'T23:59:59+05:30');
 
-  // Format as "yyyy-MM-dd HH:mm" in UTC for Jira
   function fmtUTC(d) {
     const yy = d.getUTCFullYear();
     const mm = String(d.getUTCMonth()+1).padStart(2,'0');
@@ -550,13 +546,19 @@ function buildJql(template, username, date) {
   const startUTC = `"${fmtUTC(istStart)}"`;
   const endUTC   = `"${fmtUTC(istEnd)}"`;
 
-  jql = jql.replace(/>=\s*startOfDay\(\)/gi,   `>= ${startUTC}`);
-  jql = jql.replace(/<=\s*endOfDay\(\)/gi,      `<= ${endUTC}`);
-  jql = jql.replace(/AFTER\s+startOfDay\(\)/gi, `>= ${startUTC}`);
-  jql = jql.replace(/startOfDay\(\)/gi,         startUTC);
-  jql = jql.replace(/endOfDay\(\)/gi,           endUTC);
+  // For updatedDate comparisons (closed cases JQL)
+  jql = jql.replace(/>=\s*startOfDay\(\)/gi, `>= ${startUTC}`);
+  jql = jql.replace(/<=\s*endOfDay\(\)/gi,   `<= ${endUTC}`);
 
-  console.log(`[JQL] ${username} | ${targetDate} | UTC start: ${fmtUTC(istStart)} | UTC end: ${fmtUTC(istEnd)}\n${jql}\n`);
+  // For status CHANGED ... AFTER startOfDay() (sent back, customer JQL)
+  // Use "AFTER startUTC BEFORE endUTC" to scope to exact IST day
+  jql = jql.replace(/AFTER\s+startOfDay\(\)/gi, `AFTER ${startUTC} BEFORE ${endUTC}`);
+
+  // Catch any remaining
+  jql = jql.replace(/startOfDay\(\)/gi, startUTC);
+  jql = jql.replace(/endOfDay\(\)/gi,   endUTC);
+
+  console.log(`[JQL] ${username} | ${targetDate} | UTC: ${fmtUTC(istStart)} → ${fmtUTC(istEnd)}\n${jql}\n`);
   return jql;
 }
 

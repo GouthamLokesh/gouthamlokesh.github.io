@@ -526,16 +526,18 @@ function buildJql(template, username, date) {
 
   const today = getISTToday();
 
+  // Only replace date functions when a past date is selected
+  // For today, keep startOfDay() and endOfDay() as-is so Jira handles them natively
   if (date && date !== today) {
     const nextDay = new Date(date + 'T00:00:00');
     nextDay.setDate(nextDay.getDate() + 1);
     const nextDateStr = nextDay.toLocaleDateString('en-CA');
 
-    jql = jql.replace(/AFTER\s+startOfDay\(\)/gi, `ON "${date}"`);
-    jql = jql.replace(/>=\s*startOfDay\(\)/gi, `>= "${date}"`);
-    jql = jql.replace(/<=\s*endOfDay\(\)/gi,   `< "${nextDateStr}"`);
-    jql = jql.replace(/startOfDay\(\)/gi, `"${date}"`);
-    jql = jql.replace(/endOfDay\(\)/gi,   `"${date} 23:59"`);
+    jql = jql.replace(/>=\s*startOfDay\(\)/gi,    `>= "${date}"`);
+    jql = jql.replace(/<=\s*endOfDay\(\)/gi,       `< "${nextDateStr}"`);
+    jql = jql.replace(/AFTER\s+startOfDay\(\)/gi,  `ON "${date}"`);
+    jql = jql.replace(/startOfDay\(\)/gi,          `"${date}"`);
+    jql = jql.replace(/endOfDay\(\)/gi,            `"${date} 23:59"`);
   }
 
   console.log(`[JQL] ${username} | ${date} |\n${jql}\n`);

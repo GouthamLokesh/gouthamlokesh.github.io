@@ -255,6 +255,7 @@ input[type="date"]:focus{border-color:var(--accent)}
       <div class="header-actions">
         <span class="due-badge">Due 6:00 PM IST</span>
         <input type="date" id="fetch-date"/>
+        <button class="btn btn-outline btn-sm" onclick="resetDateToToday()" title="Reset to today">Today</button>
         <button class="btn btn-outline btn-sm btn-csv" onclick="exportCSV()">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Export CSV
@@ -467,7 +468,9 @@ let trendChart=null;
 // ── Init ───────────────────────────────────────────────────────────
 window.onload = () => {
   document.getElementById('page-date').textContent = getISTDateLabel() + ' — ' + getISTTime() + ' IST';
+  // Always reset date picker to IST today on load
   document.getElementById('fetch-date').value = getISTToday();
+  console.log('[INIT] IST today:', getISTToday());
 
   pat        = localStorage.getItem('qa_pat') || '';
   proxyUrl   = localStorage.getItem('qa_proxy') || '';
@@ -527,21 +530,38 @@ function buildJql(template, username, date) {
   const today = getISTToday();
   const targetDate = date || today;
 
-  // Always replace startOfDay() and endOfDay() with explicit IST date boundaries
-  // Jira server runs in UTC — startOfDay() captures from midnight UTC = 5:30 AM IST
-  // which means it picks up previous IST day's cases. Explicit dates fix this.
-  const nextDay = new Date(targetDate + 'T00:00:00');
-  nextDay.setDate(nextDay.getDate() + 1);
-  const nextDateStr = nextDay.toLocaleDateString('en-CA');
+  // Jira server is UTC. IST = UTC+5:30.
+  // To query a full IST day, convert IST midnight boundaries to UTC:
+  // IST 00:00 = UTC prev-day 18:30
+  // IST 23:59 = UTC same-day 18:29
+  const istStart = new Date(targetDate + 'T00:00:00+05:30');
+  const istEnd   = new Date(targetDate + 'T23:59:59+05:30');
 
-  jql = jql.replace(/>=\s*startOfDay\(\)/gi,   `>= "${targetDate}"`);
-  jql = jql.replace(/<=\s*endOfDay\(\)/gi,      `<= "${targetDate} 23:59"`);
-  jql = jql.replace(/AFTER\s+startOfDay\(\)/gi, `ON "${targetDate}"`);
-  jql = jql.replace(/startOfDay\(\)/gi,         `"${targetDate}"`);
-  jql = jql.replace(/endOfDay\(\)/gi,           `"${targetDate} 23:59"`);
+  // Format as "yyyy-MM-dd HH:mm" in UTC for Jira
+  function fmtUTC(d) {
+    const yy = d.getUTCFullYear();
+    const mm = String(d.getUTCMonth()+1).padStart(2,'0');
+    const dd = String(d.getUTCDate()).padStart(2,'0');
+    const hh = String(d.getUTCHours()).padStart(2,'0');
+    const mi = String(d.getUTCMinutes()).padStart(2,'0');
+    return `${yy}-${mm}-${dd} ${hh}:${mi}`;
+  }
 
-  console.log(`[JQL] ${username} | ${targetDate} |\n${jql}\n`);
+  const startUTC = `"${fmtUTC(istStart)}"`;
+  const endUTC   = `"${fmtUTC(istEnd)}"`;
+
+  jql = jql.replace(/>=\s*startOfDay\(\)/gi,   `>= ${startUTC}`);
+  jql = jql.replace(/<=\s*endOfDay\(\)/gi,      `<= ${endUTC}`);
+  jql = jql.replace(/AFTER\s+startOfDay\(\)/gi, `>= ${startUTC}`);
+  jql = jql.replace(/startOfDay\(\)/gi,         startUTC);
+  jql = jql.replace(/endOfDay\(\)/gi,           endUTC);
+
+  console.log(`[JQL] ${username} | ${targetDate} | UTC start: ${fmtUTC(istStart)} | UTC end: ${fmtUTC(istEnd)}\n${jql}\n`);
   return jql;
+}
+
+function resetDateToToday() {
+  document.getElementById('fetch-date').value = getISTToday();
 }
 
 // ── Utilities ──────────────────────────────────────────────────────

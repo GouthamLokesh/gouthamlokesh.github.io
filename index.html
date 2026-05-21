@@ -525,22 +525,22 @@ function buildJql(template, username, date) {
   let jql = template.replace(/currentUser\(\)/g, `"${username}"`);
 
   const today = getISTToday();
+  const targetDate = date || today;
 
-  // Only replace date functions when a past date is selected
-  // For today, keep startOfDay() and endOfDay() as-is so Jira handles them natively
-  if (date && date !== today) {
-    const nextDay = new Date(date + 'T00:00:00');
-    nextDay.setDate(nextDay.getDate() + 1);
-    const nextDateStr = nextDay.toLocaleDateString('en-CA');
+  // Always replace startOfDay() and endOfDay() with explicit IST date boundaries
+  // Jira server runs in UTC — startOfDay() captures from midnight UTC = 5:30 AM IST
+  // which means it picks up previous IST day's cases. Explicit dates fix this.
+  const nextDay = new Date(targetDate + 'T00:00:00');
+  nextDay.setDate(nextDay.getDate() + 1);
+  const nextDateStr = nextDay.toLocaleDateString('en-CA');
 
-    jql = jql.replace(/>=\s*startOfDay\(\)/gi,    `>= "${date}"`);
-    jql = jql.replace(/<=\s*endOfDay\(\)/gi,       `< "${nextDateStr}"`);
-    jql = jql.replace(/AFTER\s+startOfDay\(\)/gi,  `ON "${date}"`);
-    jql = jql.replace(/startOfDay\(\)/gi,          `"${date}"`);
-    jql = jql.replace(/endOfDay\(\)/gi,            `"${date} 23:59"`);
-  }
+  jql = jql.replace(/>=\s*startOfDay\(\)/gi,   `>= "${targetDate}"`);
+  jql = jql.replace(/<=\s*endOfDay\(\)/gi,      `<= "${targetDate} 23:59"`);
+  jql = jql.replace(/AFTER\s+startOfDay\(\)/gi, `ON "${targetDate}"`);
+  jql = jql.replace(/startOfDay\(\)/gi,         `"${targetDate}"`);
+  jql = jql.replace(/endOfDay\(\)/gi,           `"${targetDate} 23:59"`);
 
-  console.log(`[JQL] ${username} | ${date} |\n${jql}\n`);
+  console.log(`[JQL] ${username} | ${targetDate} |\n${jql}\n`);
   return jql;
 }
 

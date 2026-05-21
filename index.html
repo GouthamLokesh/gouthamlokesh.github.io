@@ -1096,7 +1096,13 @@ ${qaProdList}
     </div>
     <div class="fld">
       <div class="fld-label">Plans for Tomorrow <button class="copy-btn" onclick="cpTA('${mid}-pl',this)">Copy</button></div>
-      <textarea class="fld-ta" id="${mid}-pl" rows="4" placeholder="What is ${m.displayName.split(' ')[0]} planning to work on tomorrow?"></textarea>
+      <textarea class="fld-ta" id="${mid}-pl" rows="4">${
+        qaStage.length || backlog.length
+          ? `Continue working on QA Stage cases:\n${qaStage.slice(0,5).map(i=>`• ${i.key} — ${i.fields.summary}`).join('\n')}${backlog.length?`\n\nPick up from QA Backlog:\n${backlog.slice(0,3).map(i=>`• ${i.key} — ${i.fields.summary}`).join('\n')}`:''}`
+          : qaProd.length
+          ? `Continue QA Production testing:\n${qaProd.slice(0,5).map(i=>`• ${i.key} — ${i.fields.summary}`).join('\n')}`
+          : 'Continue with assigned QA tasks.'
+      }</textarea>
     </div>
     <div class="fld">
       <div class="fld-label">Additional Comments <button class="copy-btn" onclick="cpTA('${mid}-cm',this)">Copy</button></div>

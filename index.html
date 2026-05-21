@@ -416,15 +416,15 @@ input[type="date"]:focus{border-color:var(--accent)}
     </div>
 
     <div class="settings-card">
-      <div class="s-title">🤖 Google Gemini AI (Free)</div>
-      <div class="info-box">Gemini 2.0 Flash — Google's fastest free AI model. Automatically generates Key Updates, Plans for Tomorrow, insights and risk alerts from your Jira data.</div>
+      <div class="s-title">🤖 Groq AI — Free (Llama 3.3)</div>
+      <div class="info-box">Groq runs Llama 3.3 70B — completely free, ultra fast, no credit card needed. Automatically generates Key Updates, Plans for Tomorrow, insights and risk alerts from your Jira data.</div>
       <div class="s-field">
-        <label class="s-label">Gemini API Key</label>
+        <label class="s-label">Groq API Key</label>
         <div class="pat-row">
-          <input type="password" id="s-gemini-key" class="s-input" placeholder="AIza..." autocomplete="off"/>
+          <input type="password" id="s-gemini-key" class="s-input" placeholder="gsk_..." autocomplete="off"/>
           <button class="btn btn-primary" onclick="testGeminiKey()">Test</button>
         </div>
-        <div class="s-hint">Get free key at <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a> → Create API Key. No credit card needed!</div>
+        <div class="s-hint">Get free key at <a href="https://console.groq.com" target="_blank">console.groq.com</a> → API Keys → Create API Key. No credit card needed!</div>
       </div>
       <div class="conn-result" id="ai-result"></div>
       <div class="s-field" style="margin-top:10px">
@@ -436,7 +436,7 @@ input[type="date"]:focus{border-color:var(--accent)}
       </div>
       <button class="btn btn-primary" style="margin-top:10px" onclick="saveSettings()">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-        Save Gemini Settings
+        Save Groq Settings
       </button>
     </div>
 
@@ -1118,7 +1118,7 @@ async function testGeminiKey() {
   showAIResult('Testing...','');
   try {
     const resp = await callGemini('Say "Connected!" in 2 words.');
-    showAIResult(`✅ Gemini connected! Response: ${resp}`,'ok');
+    showAIResult(`✅ Groq connected! Response: ${resp}`,'ok');
     localStorage.setItem('qa_gemini_key', geminiKey);
   } catch(e) { showAIResult(`❌ ${e.message}`,'err'); }
 }
@@ -1129,18 +1129,19 @@ function showAIResult(msg, type) {
 }
 
 async function callGemini(prompt, systemPrompt='You are a QA team assistant. Be concise and professional.') {
-  if (!geminiKey) throw new Error('No Gemini API key. Add it in Settings.');
-  const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`, {
+  if (!geminiKey) throw new Error('No Groq API key. Add it in Settings.');
+  const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${geminiKey}` },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: systemPrompt + '\n\n' + prompt }] }],
-      generationConfig: { maxOutputTokens: 500 }
+      model: 'llama-3.3-70b-versatile',
+      max_tokens: 500,
+      messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: prompt }]
     })
   });
-  if (!resp.ok) { const t = await resp.text(); throw new Error(`Gemini API ${resp.status}: ${t.slice(0,200)}`); }
+  if (!resp.ok) { const t = await resp.text(); throw new Error(`Groq API ${resp.status}: ${t.slice(0,200)}`); }
   const data = await resp.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  return data.choices?.[0]?.message?.content || '';
 }
 
 // Call Claude via Cloudflare Worker (no API key needed in browser)
@@ -1161,7 +1162,7 @@ async function generateAIForMember(mid, memberName, d, date) {
   const hasWorker = !!proxyUrl;
   const hasGemini = !!geminiKey;
   if (!hasWorker && !hasGemini) {
-    showToast('⚠ Add Gemini API key in Settings, or set up Cloudflare Worker with ANTHROPIC_KEY secret.');
+    showToast('⚠ Add Groq API key in Settings, or set up Cloudflare Worker with ANTHROPIC_KEY secret.');
     return;
   }
   const btn = document.querySelector(`[onclick="generateAIForMember('${mid}','${memberName.replace(/'/g,"\'")}')"]`);
@@ -1217,7 +1218,7 @@ Aging: ${d.aging?.map(i=>i.key).join(',')||'None'} | Overdue: ${d.overdue?.map(i
 
 async function generateAIForAll() {
   if (!proxyUrl && !geminiKey) {
-    showToast('⚠ Add Gemini API key in Settings, or set up Cloudflare Worker with ANTHROPIC_KEY.');
+    showToast('⚠ Add Groq API key in Settings, or set up Cloudflare Worker with ANTHROPIC_KEY.');
     return;
   }
   if (!Object.keys(teamData).length) { showToast('Fetch team data first.'); return; }

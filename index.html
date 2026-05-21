@@ -416,6 +416,32 @@ input[type="date"]:focus{border-color:var(--accent)}
     </div>
 
     <div class="settings-card">
+      <div class="s-title">🤖 OpenAI GPT-4o Integration</div>
+      <div class="info-box">GPT-4o automatically generates Key Updates, Plans for Tomorrow, smart insights and risk alerts based on real-time Jira data.</div>
+      <div class="s-field">
+        <label class="s-label">OpenAI API Key</label>
+        <div class="pat-row">
+          <input type="password" id="s-openai-key" class="s-input" placeholder="sk-..." autocomplete="off"/>
+          <button class="btn btn-primary" onclick="testOpenAIKey()">Test</button>
+        </div>
+        <div class="s-hint">Get free key at <a href="https://platform.openai.com" target="_blank">platform.openai.com</a> → API Keys → Create new secret key.</div>
+      </div>
+      <div class="conn-result" id="ai-result"></div>
+      <div class="s-field" style="margin-top:10px">
+        <label class="s-label">Auto-generate after fetch</label>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:6px">
+          <input type="checkbox" id="s-openai-auto" style="width:auto;accent-color:var(--accent)"/>
+          <span style="font-size:13px;color:var(--text)">Automatically run AI for all members after each fetch</span>
+        </div>
+      </div>
+      <button class="btn btn-primary" style="margin-top:10px" onclick="saveSettings()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        Save AI Settings
+      </button>
+    </div>
+
+    <div class="settings-card">
+      <div class="s-title">Team Members</div>
       <div class="info-box">Enter email (<code>Goutham.L@unilogcorp.com</code>) or username (<code>Goutham.L</code>) — email domain is stripped automatically.</div>
       <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
         <input type="text" id="m-user" class="s-input" placeholder="Email or username" style="flex:1;min-width:160px"/>
@@ -462,6 +488,7 @@ const DEFAULT_JQL_QUEUE = `assignee = currentUser() AND status in ("QA QUEUE","Q
 let pat='', proxyUrl='', jiraUrl='', connectedUser=null;
 let teamMembers=[], teamData={};
 let jqlSentBack='', jqlPushed='', jqlCustomer='', jqlBacklog='', jqlQaStage='', jqlQaProd='', jqlQueue='', agingDays=3;
+let openaiKey='', openaiAuto=false;
 let trendChart=null;
 
 // ── Init ───────────────────────────────────────────────────────────
@@ -496,6 +523,12 @@ window.onload = () => {
   document.getElementById('s-jql-qastage').value   = jqlQaStage;
   document.getElementById('s-jql-qaprod').value    = jqlQaProd;
   document.getElementById('s-aging').value = agingDays;
+
+  // OpenAI init
+  openaiKey  = localStorage.getItem('qa_openai_key') || '';
+  openaiAuto = localStorage.getItem('qa_openai_auto') === 'true';
+  document.getElementById('s-openai-key').value   = openaiKey ? '••••••••••••••••' : '';
+  document.getElementById('s-openai-auto').checked = openaiAuto;
 
   renderMemberList();
   renderHistoryList();
@@ -677,6 +710,11 @@ function saveSettings() {
   localStorage.setItem('qa_aging',        agingDays);
   localStorage.setItem('qa_proxy',        proxyUrl);
   localStorage.setItem('qa_jira_url',     jiraUrl);
+  // OpenAI settings
+  const inputOpenAIKey = document.getElementById('s-openai-key').value.trim();
+  if (inputOpenAIKey && !inputOpenAIKey.includes('•')) { openaiKey = inputOpenAIKey; localStorage.setItem('qa_openai_key', openaiKey); }
+  openaiAuto = document.getElementById('s-openai-auto').checked;
+  localStorage.setItem('qa_openai_auto', openaiAuto);
   showToast('✅ Settings saved!');
 }
 
@@ -815,6 +853,12 @@ async function fetchAll() {
   renderTabs(date);
   saveToHistory(date);
   document.getElementById('fetch-btn').disabled=false;
+
+  // Auto-generate AI if enabled
+  if (openaiAuto && openaiKey) {
+    showToast('🤖 Auto-generating AI insights...');
+    setTimeout(() => generateAIForAll(), 800);
+  }
 }
 
 // ── Team Overview ──────────────────────────────────────────────────

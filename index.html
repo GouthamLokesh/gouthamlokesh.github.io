@@ -446,7 +446,7 @@ input[type="date"]:focus{border-color:var(--accent)}
 
 const DEFAULT_JQL_SENT_BACK = `(status CHANGED FROM "QA STAGE" TO "DEV STAGE" BY currentUser() AFTER startOfDay() OR status CHANGED FROM "QA PRODUCTION" TO "DEV PRODUCTION" BY currentUser() AFTER startOfDay()) ORDER BY updated DESC`;
 
-const DEFAULT_JQL_PUSHED = `status CHANGED TO "Complete" BY currentUser() AFTER startOfDay() AND status = "Complete" ORDER BY updated DESC`;
+const DEFAULT_JQL_PUSHED = `assignee = currentUser() AND status CHANGED TO "Complete" ON startOfDay() ORDER BY updated DESC`;
 
 const DEFAULT_JQL_CUSTOMER = `(status CHANGED FROM "QA STAGE" TO "APPROVAL STAGE" BY currentUser() AFTER startOfDay() OR status CHANGED FROM "QA PRODUCTION" TO "APPROVAL PRODUCTION" BY currentUser() AFTER startOfDay()) AND status in ("APPROVAL STAGE","APPROVAL PRODUCTION") ORDER BY updated DESC`;
 
@@ -530,18 +530,20 @@ function buildJql(template, username, date) {
   const today = getISTToday();
   const targetDate = date || today;
 
-  // Jira server is IST — send dates directly as IST strings
   const startIST = `"${targetDate} 00:00"`;
   const endIST   = `"${targetDate} 23:59"`;
 
-  // For updatedDate comparisons (closed cases)
+  // status CHANGED ... ON startOfDay() → ON "date"  (Jira Server correct syntax)
+  jql = jql.replace(/ON\s+startOfDay\(\)/gi,    `ON "${targetDate}"`);
+
+  // status CHANGED ... AFTER startOfDay() → AFTER "date 00:00" BEFORE "date 23:59"
+  jql = jql.replace(/AFTER\s+startOfDay\(\)/gi, `AFTER ${startIST} BEFORE ${endIST}`);
+
+  // updatedDate comparisons
   jql = jql.replace(/>=\s*startOfDay\(\)/gi,    `>= ${startIST}`);
   jql = jql.replace(/<=\s*endOfDay\(\)/gi,       `<= ${endIST}`);
 
-  // For status CHANGED ... AFTER startOfDay() (sent back, customer)
-  jql = jql.replace(/AFTER\s+startOfDay\(\)/gi,  `AFTER ${startIST} BEFORE ${endIST}`);
-
-  // Catch any remaining
+  // catch remaining
   jql = jql.replace(/startOfDay\(\)/gi, startIST);
   jql = jql.replace(/endOfDay\(\)/gi,   endIST);
 
@@ -740,14 +742,33 @@ async function fetchAll() {
       sentBack=r.issues||[];
     } catch(e){console.warn('sentBack',m.name,e.message);}
 
-    // 2. Closed Cases — direct transitions to Complete
+    // 2. Closed Cases — fetch all Complete cases assigned to member, then filter
+    // by checking changelog for status change to Complete on the target date
+    // This works regardless of Jira Server version
     try {
-      const jqlBuilt = buildJql(jqlPushed||DEFAULT_JQL_PUSHED, m.name, date);
+      const jqlBuilt = `assignee = "${m.name}" AND status = "Complete" ORDER BY updated DESC`;
       console.log(`[CLOSED JQL] ${m.name}:\n${jqlBuilt}`);
-      const r=await jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(jqlBuilt)}&maxResults=100&fields=summary,status,updated,priority,duedate,project`);
-      closed=r.issues||[];
-      console.log(`[CLOSED] ${m.name}: ${closed.length} cases`, closed.map(i=>i.key+' '+i.fields.status?.name));
-    } catch(e){console.warn('closed',m.name,e.message);}
+      const r = await jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(jqlBuilt)}&maxResults=200&fields=summary,status,updated,priority,duedate,project&expand=changelog`);
+      const allComplete = r.issues || [];
+
+      // Filter: only keep cases where status changed TO Complete on the target date
+      const targetDateStr = (date || getISTToday());
+      closed = allComplete.filter(issue => {
+        const histories = issue.changelog?.histories || [];
+        return histories.some(h => {
+          // Check if this history entry is on the target date
+          const histDate = h.created ? h.created.substring(0, 10) : '';
+          if (histDate !== targetDateStr) return false;
+          // Check if any item in this history changed status to Complete
+          return (h.items || []).some(item =>
+            item.field === 'status' &&
+            (item.toString || '').toLowerCase() === 'complete'
+          );
+        });
+      });
+
+      console.log(`[CLOSED] ${m.name}: ${closed.length} cases on ${targetDateStr}`, closed.map(i => i.key));
+    } catch(e){ console.warn('closed', m.name, e.message); }
 
     // 3. Cases Moved to Customer
     try {

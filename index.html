@@ -416,27 +416,27 @@ input[type="date"]:focus{border-color:var(--accent)}
     </div>
 
     <div class="settings-card">
-      <div class="s-title">🤖 OpenAI GPT-4o Integration</div>
-      <div class="info-box">GPT-4o automatically generates Key Updates, Plans for Tomorrow, smart insights and risk alerts based on real-time Jira data.</div>
+      <div class="s-title">🤖 Groq AI Integration (Free)</div>
+      <div class="info-box">Groq runs Llama 3 — completely free, ultra fast. Automatically generates Key Updates, Plans for Tomorrow, insights and risk alerts from your Jira data.</div>
       <div class="s-field">
-        <label class="s-label">OpenAI API Key</label>
+        <label class="s-label">Groq API Key</label>
         <div class="pat-row">
-          <input type="password" id="s-openai-key" class="s-input" placeholder="sk-..." autocomplete="off"/>
-          <button class="btn btn-primary" onclick="testOpenAIKey()">Test</button>
+          <input type="password" id="s-groq-key" class="s-input" placeholder="gsk_..." autocomplete="off"/>
+          <button class="btn btn-primary" onclick="testGroqKey()">Test</button>
         </div>
-        <div class="s-hint">Get free key at <a href="https://platform.openai.com" target="_blank">platform.openai.com</a> → API Keys → Create new secret key.</div>
+        <div class="s-hint">Get free key at <a href="https://console.groq.com" target="_blank">console.groq.com</a> → API Keys → Create API Key. No credit card needed!</div>
       </div>
       <div class="conn-result" id="ai-result"></div>
       <div class="s-field" style="margin-top:10px">
         <label class="s-label">Auto-generate after fetch</label>
         <div style="display:flex;align-items:center;gap:10px;margin-top:6px">
-          <input type="checkbox" id="s-openai-auto" style="width:auto;accent-color:var(--accent)"/>
+          <input type="checkbox" id="s-groq-auto" style="width:auto;accent-color:var(--accent)"/>
           <span style="font-size:13px;color:var(--text)">Automatically run AI for all members after each fetch</span>
         </div>
       </div>
       <button class="btn btn-primary" style="margin-top:10px" onclick="saveSettings()">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-        Save AI Settings
+        Save Groq Settings
       </button>
     </div>
 
@@ -488,7 +488,7 @@ const DEFAULT_JQL_QUEUE = `assignee = currentUser() AND status in ("QA QUEUE","Q
 let pat='', proxyUrl='', jiraUrl='', connectedUser=null;
 let teamMembers=[], teamData={};
 let jqlSentBack='', jqlPushed='', jqlCustomer='', jqlBacklog='', jqlQaStage='', jqlQaProd='', jqlQueue='', agingDays=3;
-let openaiKey='', openaiAuto=false;
+let groqKey='', groqAuto=false;
 let trendChart=null;
 
 // ── Init ───────────────────────────────────────────────────────────
@@ -525,10 +525,10 @@ window.onload = () => {
   document.getElementById('s-aging').value = agingDays;
 
   // OpenAI init
-  openaiKey  = localStorage.getItem('qa_openai_key') || '';
-  openaiAuto = localStorage.getItem('qa_openai_auto') === 'true';
-  document.getElementById('s-openai-key').value   = openaiKey ? '••••••••••••••••' : '';
-  document.getElementById('s-openai-auto').checked = openaiAuto;
+  groqKey  = localStorage.getItem('qa_groq_key') || '';
+  groqAuto = localStorage.getItem('qa_groq_auto') === 'true';
+  document.getElementById('s-groq-key').value   = groqKey ? '••••••••••••••••' : '';
+  document.getElementById('s-groq-auto').checked = groqAuto;
 
   renderMemberList();
   renderHistoryList();
@@ -711,10 +711,10 @@ function saveSettings() {
   localStorage.setItem('qa_proxy',        proxyUrl);
   localStorage.setItem('qa_jira_url',     jiraUrl);
   // OpenAI settings
-  const inputOpenAIKey = document.getElementById('s-openai-key').value.trim();
-  if (inputOpenAIKey && !inputOpenAIKey.includes('•')) { openaiKey = inputOpenAIKey; localStorage.setItem('qa_openai_key', openaiKey); }
-  openaiAuto = document.getElementById('s-openai-auto').checked;
-  localStorage.setItem('qa_openai_auto', openaiAuto);
+  const inputGroqKey = document.getElementById('s-groq-key').value.trim();
+  if (inputGroqKey && !inputGroqKey.includes('•')) { groqKey = inputGroqKey; localStorage.setItem('qa_groq_key', groqKey); }
+  groqAuto = document.getElementById('s-groq-auto').checked;
+  localStorage.setItem('qa_groq_auto', groqAuto);
   showToast('✅ Settings saved!');
 }
 
@@ -855,7 +855,7 @@ async function fetchAll() {
   document.getElementById('fetch-btn').disabled=false;
 
   // Auto-generate AI if enabled
-  if (openaiAuto && openaiKey) {
+  if (groqAuto && groqKey) {
     showToast('🤖 Auto-generating AI insights...');
     setTimeout(() => generateAIForAll(), 800);
   }
@@ -1104,88 +1104,86 @@ ${qaProdList}
 function cpTA(id,btn){const el=document.getElementById(id);if(!el)return;navigator.clipboard.writeText(el.value).then(()=>flash(btn));}
 function cpRO(id,btn){const el=document.getElementById(id);if(!el)return;navigator.clipboard.writeText(el.innerText).then(()=>flash(btn));}
 function flash(btn){if(!btn)return;const o=btn.innerHTML;btn.innerHTML='✓';btn.classList.add('copied');setTimeout(()=>{btn.innerHTML=o;btn.classList.remove('copied');},1500);}
-// ── OpenAI GPT-4o ────────────────────────────────────────────────
-async function testOpenAIKey() {
-  const inputKey = document.getElementById('s-openai-key').value.trim();
+// ── Groq AI / Claude via Worker ──────────────────────────────────
+async function testGroqKey() {
+  const inputKey = document.getElementById('s-groq-key').value.trim();
   if (!inputKey || inputKey.includes('•')) { showAIResult('⚠ Enter a valid API key.','err'); return; }
-  openaiKey = inputKey;
+  groqKey = inputKey;
   showAIResult('Testing...','');
   try {
-    const resp = await callOpenAI('Say "Connected!" in 2 words.');
-    showAIResult(`✅ OpenAI connected! Response: ${resp}`,'ok');
-    localStorage.setItem('qa_openai_key', openaiKey);
+    const resp = await callGroq('Say "Connected!" in 2 words.');
+    showAIResult(`✅ Groq connected! Response: ${resp}`,'ok');
+    localStorage.setItem('qa_groq_key', groqKey);
   } catch(e) { showAIResult(`❌ ${e.message}`,'err'); }
 }
 
 function showAIResult(msg, type) {
   const el = document.getElementById('ai-result');
-  el.textContent = msg;
-  el.className = 'conn-result ' + type;
+  if (el) { el.textContent = msg; el.className = 'conn-result ' + type; }
 }
 
-async function callOpenAI(prompt, systemPrompt='You are a QA team assistant. Be concise and professional.') {
-  if (!openaiKey) throw new Error('No OpenAI API key. Add it in Settings.');
-  const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+async function callGroq(prompt, systemPrompt='You are a QA team assistant. Be concise and professional.') {
+  if (!groqKey) throw new Error('No Groq API key. Add it in Settings.');
+  const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${openaiKey}`
-    },
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${groqKey}` },
     body: JSON.stringify({
-      model: 'gpt-4o',
-      max_tokens: 1000,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: prompt }
-      ]
+      model: 'llama3-8b-8192',
+      max_tokens: 500,
+      messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: prompt }]
     })
   });
-  if (!resp.ok) { const t = await resp.text(); throw new Error(`OpenAI API ${resp.status}: ${t.slice(0,200)}`); }
+  if (!resp.ok) { const t = await resp.text(); throw new Error(`Groq API ${resp.status}: ${t.slice(0,200)}`); }
   const data = await resp.json();
   return data.choices?.[0]?.message?.content || '';
 }
 
+// Call Claude via Cloudflare Worker (no API key needed in browser)
+async function generateViaWorker(allMemberData, date) {
+  const workerUrl = proxyUrl.replace(/\/$/,'');
+  if (!workerUrl) throw new Error('No Cloudflare Worker URL set in Settings.');
+
+  const resp = await fetch(`${workerUrl}/ai/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ memberData: allMemberData, date })
+  });
+  if (!resp.ok) { const t = await resp.text(); throw new Error(`Worker AI ${resp.status}: ${t.slice(0,200)}`); }
+  return resp.json();
+}
+
 async function generateAIForMember(mid, memberName, d, date) {
-  if (!openaiKey) {
-    showToast('⚠ Add OpenAI API key in Settings first. Sign up at platform.openai.com with your personal Gmail.');
+  const hasWorker = !!proxyUrl;
+  const hasGroq = !!groqKey;
+  if (!hasWorker && !hasGroq) {
+    showToast('⚠ Add Groq API key in Settings, or set up Cloudflare Worker with ANTHROPIC_KEY secret.');
     return;
   }
-
-  const btn = document.querySelector(`[onclick="generateAIForMember('${mid}','${memberName.replace(/'/g,"\\'")}')"]`);
+  const btn = document.querySelector(`[onclick="generateAIForMember('${mid}','${memberName.replace(/'/g,"\'")}')"]`);
   if (btn) { btn.textContent = '⏳ Generating...'; btn.disabled = true; }
-
   try {
-    const { closed, customer, sentBack, backlog, qaStage, qaProd, aging, overdue } = d;
-
-    const context = `
-QA Engineer: ${memberName}
-Date: ${date}
-
-CLOSED CASES (${closed.length}): ${closed.map(i=>`${i.key}: ${i.fields.summary}`).join('; ') || 'None'}
-CASES MOVED TO CUSTOMER (${customer.length}): ${customer.map(i=>`${i.key}: ${i.fields.summary}`).join('; ') || 'None'}
-SENT BACK TO DEV (${sentBack.length}): ${sentBack.map(i=>`${i.key}: ${i.fields.summary}`).join('; ') || 'None'}
-QA BACKLOG (${backlog.length}): ${backlog.map(i=>`${i.key}: ${i.fields.summary}`).join('; ') || 'None'}
-QA STAGE - WORKING (${qaStage.length}): ${qaStage.map(i=>`${i.key}: ${i.fields.summary}`).join('; ') || 'None'}
-QA PRODUCTION (${qaProd.length}): ${qaProd.map(i=>`${i.key}: ${i.fields.summary}`).join('; ') || 'None'}
-AGING CASES (${aging.length}): ${aging.map(i=>i.key).join(', ') || 'None'}
-OVERDUE CASES (${overdue.length}): ${overdue.map(i=>i.key).join(', ') || 'None'}`;
-
-    const [keyUpdates, plans, comments, risks] = await Promise.all([
-      callOpenAI(`Based on this QA engineer's daily work data, write a professional Key Updates summary (3-5 bullet points, start each with •):\n${context}`),
-      callOpenAI(`Based on this QA engineer's current backlog and active cases, suggest Plans for Tomorrow (3-4 bullet points, start each with •):\n${context}`),
-      callOpenAI(`Write a brief Additional Comments section (2-3 sentences) mentioning workload, risks, and any blockers:\n${context}`),
-      callOpenAI(`Identify any risks or concerns from this QA data. Be brief (2-3 sentences):\n${context}`)
-    ]);
-
-    // Update form fields
+    let keyUpdates, plans, comments, risks;
+    if (hasWorker) {
+      const payload = {}; payload[d.member?.name] = d;
+      const result = await generateViaWorker(payload, date);
+      const r = result.results?.[d.member?.name];
+      if (!r) throw new Error('No result from worker');
+      ({ keyUpdates, plans, comments, risks } = r);
+    } else {
+      const context = buildContextLocal(d, date);
+      [keyUpdates, plans, comments, risks] = await Promise.all([
+        callGroq(`Write Key Updates summary (3-5 bullet points starting with •):\n${context}`),
+        callGroq(`Suggest Plans for Tomorrow (3-4 bullet points starting with •):\n${context}`),
+        callGroq(`Write Additional Comments (2-3 sentences) about workload and blockers:\n${context}`),
+        callGroq(`Identify risks or concerns (2-3 sentences):\n${context}`)
+      ]);
+    }
     const kuEl = document.getElementById(`${mid}-ku`);
     const plEl = document.getElementById(`${mid}-pl`);
     const cmEl = document.getElementById(`${mid}-cm`);
-    if (kuEl) kuEl.value = keyUpdates;
-    if (plEl) plEl.value = plans;
-    if (cmEl) cmEl.value = comments;
-
-    // Add AI insights section
+    if (kuEl) kuEl.value = keyUpdates || '';
+    if (plEl) plEl.value = plans || '';
+    if (cmEl) cmEl.value = comments || '';
     let insightEl = document.getElementById(`${mid}-ai-insights`);
     if (!insightEl) {
       insightEl = document.createElement('div');
@@ -1194,30 +1192,66 @@ OVERDUE CASES (${overdue.length}): ${overdue.map(i=>i.key).join(', ') || 'None'}
       const formBody = document.getElementById(`${mid}-ku`)?.closest('.form-body');
       if (formBody) formBody.parentNode.insertBefore(insightEl, formBody);
     }
-    insightEl.innerHTML = `
-      <div style="font-family:var(--mono);font-size:10px;color:var(--accent2);letter-spacing:1px;margin-bottom:10px">🤖 AI INSIGHTS — ${memberName}</div>
-      <div style="font-size:12px;color:var(--text);line-height:1.7;white-space:pre-wrap">${risks}</div>`;
-
+    insightEl.innerHTML = `<div style="font-family:var(--mono);font-size:10px;color:var(--accent2);letter-spacing:1px;margin-bottom:8px">🤖 AI INSIGHTS — ${memberName}</div><div style="font-size:12px;color:var(--text);line-height:1.7;white-space:pre-wrap">${risks||''}</div>`;
     showToast(`✅ AI generated for ${memberName}!`);
   } catch(e) {
-    showToast(`❌ OpenAI error: ${e.message}`);
+    showToast(`❌ AI error: ${e.message}`);
   } finally {
     if (btn) { btn.textContent = '🤖 Generate AI'; btn.disabled = false; }
   }
 }
 
-async function generateAIForAll() {
-  if (!openaiKey) { showToast('⚠ Add OpenAI API key in Settings first.'); return; }
-  if (!Object.keys(teamData).length) { showToast('Fetch team data first.'); return; }
-  showToast('🤖 Generating AI for all members...');
-  const date = document.getElementById('fetch-date').value;
-  for (let i = 0; i < teamMembers.length; i++) {
-    const m = teamMembers[i];
-    const d = teamData[m.name];
-    if (d) await generateAIForMember(`m${i}`, m.displayName, d, date);
-  }
-  showToast('✅ AI generated for all members!');
+function buildContextLocal(d, date) {
+  const fmt = (arr) => arr?.length ? arr.map(i=>`${i.key}: ${i.fields?.summary||''}`).join('; ') : 'None';
+  return `QA Engineer: ${d.member?.displayName} | Date: ${date}
+Closed: ${fmt(d.closed)} | Moved to Customer: ${fmt(d.customer)}
+Sent Back: ${fmt(d.sentBack)} | Backlog: ${fmt(d.backlog)}
+QA Stage: ${fmt(d.qaStage)} | QA Production: ${fmt(d.qaProd)}
+Aging: ${d.aging?.map(i=>i.key).join(',')||'None'} | Overdue: ${d.overdue?.map(i=>i.key).join(',')||'None'}`;
 }
+
+async function generateAIForAll() {
+  if (!proxyUrl && !groqKey) {
+    showToast('⚠ Add Groq API key in Settings, or set up Cloudflare Worker with ANTHROPIC_KEY.');
+    return;
+  }
+  if (!Object.keys(teamData).length) { showToast('Fetch team data first.'); return; }
+  const date = document.getElementById('fetch-date').value;
+  if (proxyUrl) {
+    showToast('🤖 Generating AI via Worker for all members...');
+    try {
+      const result = await generateViaWorker(teamData, date);
+      const results = result.results || {};
+      teamMembers.forEach((m, idx) => {
+        const r = results[m.name]; if (!r) return;
+        const mid = `m${idx}`;
+        const kuEl = document.getElementById(`${mid}-ku`);
+        const plEl = document.getElementById(`${mid}-pl`);
+        const cmEl = document.getElementById(`${mid}-cm`);
+        if (kuEl) kuEl.value = r.keyUpdates || '';
+        if (plEl) plEl.value = r.plans || '';
+        if (cmEl) cmEl.value = r.comments || '';
+        let insightEl = document.getElementById(`${mid}-ai-insights`);
+        if (!insightEl) {
+          insightEl = document.createElement('div');
+          insightEl.id = `${mid}-ai-insights`;
+          insightEl.style.cssText = 'background:rgba(124,92,191,0.08);border:1px solid rgba(124,92,191,0.3);border-radius:10px;padding:14px;margin-top:12px';
+          const formBody = document.getElementById(`${mid}-ku`)?.closest('.form-body');
+          if (formBody) formBody.parentNode.insertBefore(insightEl, formBody);
+        }
+        insightEl.innerHTML = `<div style="font-family:var(--mono);font-size:10px;color:var(--accent2);letter-spacing:1px;margin-bottom:8px">🤖 AI INSIGHTS — ${m.displayName}</div><div style="font-size:12px;color:var(--text);line-height:1.7;white-space:pre-wrap">${r.risks||''}</div>`;
+      });
+      showToast(`✅ AI generated for all ${teamMembers.length} members!`);
+    } catch(e) { showToast(`❌ Worker AI error: ${e.message}`); }
+  } else {
+    for (let i=0; i<teamMembers.length; i++) {
+      const m = teamMembers[i], d = teamData[m.name];
+      if (d) await generateAIForMember(`m${i}`, m.displayName, d, date);
+    }
+    showToast(`✅ AI generated for all ${teamMembers.length} members!`);
+  }
+}
+
 
 function renderAIButton(mid, memberName) {
   return `<button class="btn btn-sm" style="background:linear-gradient(135deg,var(--accent),var(--accent2));color:white;border:none" onclick="generateAIForMember('${mid}','${memberName.replace(/'/g,"\\'")}')">🤖 Generate AI</button>`;

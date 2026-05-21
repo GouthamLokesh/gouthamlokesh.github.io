@@ -726,86 +726,55 @@ async function fetchAll() {
   const fill=document.getElementById('prog-fill');
   const lbl=document.getElementById('prog-lbl');
 
-  for(let i=0;i<teamMembers.length;i++) {
-    const m=teamMembers[i];
-    fill.style.width=Math.round((i/teamMembers.length)*100)+'%';
-    lbl.textContent=`Fetching: ${m.displayName} (${i+1}/${teamMembers.length})`;
-    showSbar('fetch-status',`Fetching cases for ${m.displayName}...`,'loading');
+  lbl.textContent=`Fetching data for ${teamMembers.length} members in parallel...`;
+  showSbar('fetch-status',`Fetching all ${teamMembers.length} members simultaneously...`,'loading');
 
-    let sentBack=[],closed=[],customer=[],backlog=[],qaStage=[],qaProd=[];
+  // Fetch all members in parallel batches of 5
+  const BATCH_SIZE = 5;
+  let completed = 0;
 
-    // 1. Sent Back to Dev
-    try {
-      const r=await jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(buildJql(jqlSentBack||DEFAULT_JQL_SENT_BACK,m.name,date))}&maxResults=100&fields=summary,status,updated,priority,duedate,project`);
-      sentBack=r.issues||[];
-    } catch(e){console.warn('sentBack',m.name,e.message);}
+  async function fetchMember(m) {
+    const uname = m.name;
+    const bq = (t) => t.replace(/currentUser\(\)/g, `"${uname}"`);
+    const fields = 'summary,status,updated,priority,duedate,project';
 
-    // 2. Closed Cases — fetch all Complete cases, filter by changelog date
-    try {
-      const jqlBuilt = `assignee = "${m.name}" AND status = "Complete" ORDER BY updated DESC`;
-      console.log(`[CLOSED JQL] ${m.name}:\n${jqlBuilt}`);
-      const r = await jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(jqlBuilt)}&maxResults=200&fields=summary,status,updated,priority,duedate,project&expand=changelog`);
-      const allComplete = r.issues || [];
+    // Run all queries in parallel for this member — 3 calls instead of 5
+    // Combine backlog+qaStage+qaProd into one query
+    const [r1, r2, r3, r4] = await Promise.allSettled([
+      // 1. Sent Back to Dev
+      jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(buildJql(jqlSentBack||DEFAULT_JQL_SENT_BACK,uname,date))}&maxResults=100&fields=${fields}`),
+      // 2. Closed (with changelog for date filtering)
+      jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(`assignee="${uname}" AND status="Complete" ORDER BY updated DESC`)}&maxResults=200&fields=${fields}&expand=changelog`),
+      // 3. Cases Moved to Customer
+      jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(buildJql(jqlCustomer||DEFAULT_JQL_CUSTOMER,uname,date))}&maxResults=100&fields=${fields}`),
+      // 4. Queue: Backlog + QA Stage + QA Production in ONE query
+      jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(bq(jqlQueue||DEFAULT_JQL_QUEUE))}&maxResults=200&fields=${fields}`)
+    ]);
 
-      const targetDateStr = date || getISTToday();
+    const sentBack = r1.status==='fulfilled' ? (r1.value.issues||[]) : [];
+    const customer = r3.status==='fulfilled' ? (r3.value.issues||[]) : [];
+    const allQueue = r4.status==='fulfilled' ? (r4.value.issues||[]) : [];
 
-      closed = allComplete.filter(issue => {
-        const histories = issue.changelog?.histories || [];
-        return histories.some(h => {
-          if (!h.created) return false;
-          // Convert changelog timestamp to IST date string
-          // Jira timestamps include timezone e.g. "2026-05-18T17:39:00.000+0530"
-          // new Date() parses the timezone correctly, then we extract IST date
-          const createdDate = new Date(h.created);
-          // Format in IST timezone
-          const histDateIST = createdDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+    // Split queue into backlog/qaStage/qaProd by status
+    const backlog  = allQueue.filter(i=>(i.fields.status?.name||'').toLowerCase().includes('queue'));
+    const qaStage  = allQueue.filter(i=>(i.fields.status?.name||'').toLowerCase()==='qa stage');
+    const qaProd   = allQueue.filter(i=>(i.fields.status?.name||'').toLowerCase()==='qa production');
 
-          console.log(`[CHANGELOG] ${issue.key} | created: ${h.created} | IST date: ${histDateIST} | target: ${targetDateStr}`);
+    // Filter closed by changelog date
+    const targetDateStr = date || getISTToday();
+    const allComplete = r2.status==='fulfilled' ? (r2.value.issues||[]) : [];
+    const closed = allComplete.filter(issue =>
+      (issue.changelog?.histories||[]).some(h => {
+        if (!h.created) return false;
+        const histDateIST = new Date(h.created).toLocaleDateString('en-CA',{timeZone:'Asia/Kolkata'});
+        if (histDateIST !== targetDateStr) return false;
+        return (h.items||[]).some(item => item.field==='status' && (item.toString||'').toLowerCase()==='complete');
+      })
+    );
 
-          if (histDateIST !== targetDateStr) return false;
-          return (h.items || []).some(item =>
-            item.field === 'status' &&
-            (item.toString || '').toLowerCase() === 'complete'
-          );
-        });
-      });
-
-      console.log(`[CLOSED] ${m.name}: ${closed.length} cases on ${targetDateStr}`, closed.map(i => i.key));
-    } catch(e){ console.warn('closed', m.name, e.message); }
-
-    // 3. Cases Moved to Customer
-    try {
-      const r=await jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(buildJql(jqlCustomer||DEFAULT_JQL_CUSTOMER,m.name,date))}&maxResults=100&fields=summary,status,updated,priority,duedate,project`);
-      customer=r.issues||[];
-    } catch(e){console.warn('customer',m.name,e.message);}
-
-    // Helper to build queue JQL for current state (no date filter for backlog/stage/prod)
-    const buildQueueJql = (template) => template.replace(/currentUser\(\)/g, `"${m.name}"`);
-
-    // 3. QA Backlog
-    try {
-      const r=await jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(buildQueueJql(jqlBacklog||DEFAULT_JQL_BACKLOG))}&maxResults=100&fields=summary,status,updated,priority,duedate,project`);
-      backlog=r.issues||[];
-    } catch(e){console.warn('backlog',m.name,e.message);}
-
-    // 4. QA Stage (actively working)
-    try {
-      const r=await jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(buildQueueJql(jqlQaStage||DEFAULT_JQL_QA_STAGE))}&maxResults=100&fields=summary,status,updated,priority,duedate,project`);
-      qaStage=r.issues||[];
-    } catch(e){console.warn('qaStage',m.name,e.message);}
-
-    // 5. QA Production
-    try {
-      const r=await jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(buildQueueJql(jqlQaProd||DEFAULT_JQL_QA_PROD))}&maxResults=100&fields=summary,status,updated,priority,duedate,project`);
-      qaProd=r.issues||[];
-    } catch(e){console.warn('qaProd',m.name,e.message);}
-
-    const allIssues=[...new Map([...closed,...customer,...sentBack,...backlog,...qaStage,...qaProd].map(i=>[i.key,i])).values()];
-    // Aging = QA Stage cases not updated for N+ days
+    const allIssues=[...new Map([...closed,...customer,...sentBack,...allQueue].map(i=>[i.key,i])).values()];
     const aging=qaStage.filter(i=>isAging(i.fields.updated));
-    // Overdue = any case with past due date
     const overdue=allIssues.filter(i=>isOverdue(i.fields.duedate));
-    // Priority breakdown from active QA Stage cases
     const priorities={critical:0,high:0,medium:0,low:0};
     [...qaStage,...qaProd].forEach(i=>{
       const p=(i.fields.priority?.name||'').toLowerCase();
@@ -815,18 +784,37 @@ async function fetchAll() {
       else priorities.low++;
     });
 
-    teamData[m.name]={member:m, sentBack, closed, customer, backlog, qaStage, qaProd, aging, overdue, priorities, allIssues};
+    return {member:m, sentBack, closed, customer, backlog, qaStage, qaProd, aging, overdue, priorities, allIssues};
+  }
+
+  // Process in batches of BATCH_SIZE
+  for(let i=0; i<teamMembers.length; i+=BATCH_SIZE) {
+    const batch = teamMembers.slice(i, i+BATCH_SIZE);
+    lbl.textContent=`Fetching members ${i+1}–${Math.min(i+BATCH_SIZE,teamMembers.length)} of ${teamMembers.length}...`;
+    fill.style.width=Math.round((i/teamMembers.length)*100)+'%';
+
+    const results = await Promise.allSettled(batch.map(m => fetchMember(m)));
+    results.forEach((r, idx) => {
+      const m = batch[idx];
+      if (r.status==='fulfilled') {
+        teamData[m.name] = r.value;
+      } else {
+        console.warn('Failed for', m.name, r.reason);
+        teamData[m.name] = {member:m, sentBack:[],closed:[],customer:[],backlog:[],qaStage:[],qaProd:[],aging:[],overdue:[],priorities:{critical:0,high:0,medium:0,low:0},allIssues:[]};
+      }
+      completed++;
+    });
+    fill.style.width=Math.round((completed/teamMembers.length)*100)+'%';
   }
 
   fill.style.width='100%';
   lbl.textContent=`Done — fetched all ${teamMembers.length} members`;
-  showSbar('fetch-status',`✅ Successfully fetched data for all ${teamMembers.length} team members.`,'ok');
+  showSbar('fetch-status',`✅ Fetched data for all ${teamMembers.length} members.`,'ok');
 
   renderTeamOverview();
   renderTabs(date);
   saveToHistory(date);
   document.getElementById('fetch-btn').disabled=false;
-
 }
 
 // ── Team Overview ──────────────────────────────────────────────────
@@ -1072,49 +1060,50 @@ ${qaProdList}
 function cpTA(id,btn){const el=document.getElementById(id);if(!el)return;navigator.clipboard.writeText(el.value).then(()=>flash(btn));}
 function cpRO(id,btn){const el=document.getElementById(id);if(!el)return;navigator.clipboard.writeText(el.innerText).then(()=>flash(btn));}
 function flash(btn){if(!btn)return;const o=btn.innerHTML;btn.innerHTML='✓';btn.classList.add('copied');setTimeout(()=>{btn.innerHTML=o;btn.classList.remove('copied');},1500);}
-// ── Claude AI ─────────────────────────────────────────────────────
-async function testClaudeKey() {
-  const inputKey = document.getElementById('s-claude-key').value.trim();
-  if (!inputKey || inputKey.includes('•')) { showClaudeResult('⚠ Enter a valid API key.','err'); return; }
-  claudeKey = inputKey;
-  showClaudeResult('Testing...','');
+// ── OpenAI GPT-4o ────────────────────────────────────────────────
+async function testOpenAIKey() {
+  const inputKey = document.getElementById('s-openai-key').value.trim();
+  if (!inputKey || inputKey.includes('•')) { showAIResult('⚠ Enter a valid API key.','err'); return; }
+  openaiKey = inputKey;
+  showAIResult('Testing...','');
   try {
-    const resp = await callClaude('Say "Connected!" in 2 words.');
-    showClaudeResult(`✅ Claude connected! Response: ${resp}`,'ok');
-    localStorage.setItem('qa_claude_key', claudeKey);
-  } catch(e) { showClaudeResult(`❌ ${e.message}`,'err'); }
+    const resp = await callOpenAI('Say "Connected!" in 2 words.');
+    showAIResult(`✅ OpenAI connected! Response: ${resp}`,'ok');
+    localStorage.setItem('qa_openai_key', openaiKey);
+  } catch(e) { showAIResult(`❌ ${e.message}`,'err'); }
 }
 
-function showClaudeResult(msg, type) {
-  const el = document.getElementById('claude-result');
+function showAIResult(msg, type) {
+  const el = document.getElementById('ai-result');
   el.textContent = msg;
   el.className = 'conn-result ' + type;
 }
 
-async function callClaude(prompt, systemPrompt='You are a QA team assistant. Be concise and professional.') {
-  if (!claudeKey) throw new Error('No Claude API key. Add it in Settings.');
-  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+async function callOpenAI(prompt, systemPrompt='You are a QA team assistant. Be concise and professional.') {
+  if (!openaiKey) throw new Error('No OpenAI API key. Add it in Settings.');
+  const resp = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': claudeKey,
-      'anthropic-version': '2023-06-01'
+      'Authorization': `Bearer ${openaiKey}`
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: 'gpt-4o',
       max_tokens: 1000,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: prompt }]
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: prompt }
+      ]
     })
   });
-  if (!resp.ok) { const t = await resp.text(); throw new Error(`Claude API ${resp.status}: ${t.slice(0,200)}`); }
+  if (!resp.ok) { const t = await resp.text(); throw new Error(`OpenAI API ${resp.status}: ${t.slice(0,200)}`); }
   const data = await resp.json();
-  return data.content?.[0]?.text || '';
+  return data.choices?.[0]?.message?.content || '';
 }
 
 async function generateAIForMember(mid, memberName, d, date) {
-  if (!claudeKey) {
-    showToast('⚠ Add Claude API key in Settings first. Sign up at console.anthropic.com with your personal Gmail.');
+  if (!openaiKey) {
+    showToast('⚠ Add OpenAI API key in Settings first. Sign up at platform.openai.com with your personal Gmail.');
     return;
   }
 
@@ -1138,10 +1127,10 @@ AGING CASES (${aging.length}): ${aging.map(i=>i.key).join(', ') || 'None'}
 OVERDUE CASES (${overdue.length}): ${overdue.map(i=>i.key).join(', ') || 'None'}`;
 
     const [keyUpdates, plans, comments, risks] = await Promise.all([
-      callClaude(`Based on this QA engineer's daily work data, write a professional Key Updates summary (3-5 bullet points, start each with •):\n${context}`),
-      callClaude(`Based on this QA engineer's current backlog and active cases, suggest Plans for Tomorrow (3-4 bullet points, start each with •):\n${context}`),
-      callClaude(`Write a brief Additional Comments section (2-3 sentences) mentioning workload, risks, and any blockers:\n${context}`),
-      callClaude(`Identify any risks or concerns from this QA data. Be brief (2-3 sentences):\n${context}`)
+      callOpenAI(`Based on this QA engineer's daily work data, write a professional Key Updates summary (3-5 bullet points, start each with •):\n${context}`),
+      callOpenAI(`Based on this QA engineer's current backlog and active cases, suggest Plans for Tomorrow (3-4 bullet points, start each with •):\n${context}`),
+      callOpenAI(`Write a brief Additional Comments section (2-3 sentences) mentioning workload, risks, and any blockers:\n${context}`),
+      callOpenAI(`Identify any risks or concerns from this QA data. Be brief (2-3 sentences):\n${context}`)
     ]);
 
     // Update form fields
@@ -1167,14 +1156,14 @@ OVERDUE CASES (${overdue.length}): ${overdue.map(i=>i.key).join(', ') || 'None'}
 
     showToast(`✅ AI generated for ${memberName}!`);
   } catch(e) {
-    showToast(`❌ Claude error: ${e.message}`);
+    showToast(`❌ OpenAI error: ${e.message}`);
   } finally {
     if (btn) { btn.textContent = '🤖 Generate AI'; btn.disabled = false; }
   }
 }
 
 async function generateAIForAll() {
-  if (!claudeKey) { showToast('⚠ Add Claude API key in Settings first.'); return; }
+  if (!openaiKey) { showToast('⚠ Add OpenAI API key in Settings first.'); return; }
   if (!Object.keys(teamData).length) { showToast('Fetch team data first.'); return; }
   showToast('🤖 Generating AI for all members...');
   const date = document.getElementById('fetch-date').value;
@@ -1189,7 +1178,7 @@ async function generateAIForAll() {
 function renderAIButton(mid, memberName) {
   return `<button class="btn btn-sm" style="background:linear-gradient(135deg,var(--accent),var(--accent2));color:white;border:none" onclick="generateAIForMember('${mid}','${memberName.replace(/'/g,"\\'")}')">🤖 Generate AI</button>`;
 }
-// ── End Claude AI ──────────────────────────────────────────────────
+// ── End OpenAI ───────────────────────────────────────────────────
 
 function copyAll(mid,name){
   const get = (id,ta) => { const el=document.getElementById(id); return el?(ta?el.value:el.innerText):''; };

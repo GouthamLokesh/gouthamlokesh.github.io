@@ -770,89 +770,99 @@ async function fetchAll() {
   const fill=document.getElementById('prog-fill');
   const lbl=document.getElementById('prog-lbl');
 
-  lbl.textContent=`Fetching data for ${teamMembers.length} members in parallel...`;
-  showSbar('fetch-status',`Fetching all ${teamMembers.length} members simultaneously...`,'loading');
+  const fields = 'summary,status,updated,priority,duedate,project';
+  const usernames = teamMembers.map(m=>m.name);
+  // Build "assignee IN ("u1","u2",...)" clause for bulk queries
+  const assigneeIN = `assignee IN (${usernames.map(u=>`"${u}"`).join(',')})`;
 
-  // Fetch all members in parallel batches of 5
-  const BATCH_SIZE = 5;
-  let completed = 0;
+  // Initialize teamData for all members
+  teamMembers.forEach(m => {
+    teamData[m.name] = {member:m,sentBack:[],closed:[],customer:[],backlog:[],qaStage:[],qaProd:[],aging:[],overdue:[],priorities:{critical:0,high:0,medium:0,low:0},allIssues:[]};
+  });
 
-  async function fetchMember(m) {
-    const uname = m.name;
-    const bq = (t) => t.replace(/currentUser\(\)/g, `"${uname}"`);
-    const fields = 'summary,status,updated,priority,duedate,project';
+  lbl.textContent='Running 4 bulk queries for all members...';
+  fill.style.width='10%';
+  showSbar('fetch-status','Fetching all team data in 4 bulk queries...','loading');
 
-    // Run all queries in parallel for this member — 3 calls instead of 5
-    // Combine backlog+qaStage+qaProd into one query
-    const [r1, r2, r3, r4] = await Promise.allSettled([
-      // 1. Sent Back to Dev
-      jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(buildJql(jqlSentBack||DEFAULT_JQL_SENT_BACK,uname,date))}&maxResults=100&fields=${fields}`),
-      // 2. Closed (with changelog for date filtering)
-      jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(`assignee="${uname}" AND status="Complete" ORDER BY updated DESC`)}&maxResults=200&fields=${fields}&expand=changelog`),
-      // 3. Cases Moved to Customer
-      jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(buildJql(jqlCustomer||DEFAULT_JQL_CUSTOMER,uname,date))}&maxResults=100&fields=${fields}`),
-      // 4. Queue: Backlog + QA Stage + QA Production in ONE query
-      jiraReq(`/rest/api/2/search?jql=${encodeURIComponent(bq(jqlQueue||DEFAULT_JQL_QUEUE))}&maxResults=200&fields=${fields}`)
-    ]);
+  try {
+    // ── BULK QUERY 1: Sent Back to Dev (all members) ──
+    lbl.textContent='Query 1/4 — Sent Back to Dev...';
+    fill.style.width='20%';
+    const jqlSB = buildJqlBulk(jqlSentBack||DEFAULT_JQL_SENT_BACK, assigneeIN, date);
+    const r1 = await jiraReqSafe(`/rest/api/2/search?jql=${encodeURIComponent(jqlSB)}&maxResults=500&fields=${fields}`);
+    (r1?.issues||[]).forEach(i => {
+      const uname = i.fields.assignee?.name || i.fields.assignee?.key;
+      if (uname && teamData[uname]) teamData[uname].sentBack.push(i);
+    });
 
-    const sentBack = r1.status==='fulfilled' ? (r1.value.issues||[]) : [];
-    const customer = r3.status==='fulfilled' ? (r3.value.issues||[]) : [];
-    const allQueue = r4.status==='fulfilled' ? (r4.value.issues||[]) : [];
+    // ── BULK QUERY 2: Cases Moved to Customer (all members) ──
+    lbl.textContent='Query 2/4 — Cases Moved to Customer...';
+    fill.style.width='40%';
+    const jqlCU = buildJqlBulk(jqlCustomer||DEFAULT_JQL_CUSTOMER, assigneeIN, date);
+    const r2 = await jiraReqSafe(`/rest/api/2/search?jql=${encodeURIComponent(jqlCU)}&maxResults=500&fields=${fields}`);
+    (r2?.issues||[]).forEach(i => {
+      const uname = i.fields.assignee?.name || i.fields.assignee?.key;
+      if (uname && teamData[uname]) teamData[uname].customer.push(i);
+    });
 
-    // Split queue into backlog/qaStage/qaProd by status
-    const backlog  = allQueue.filter(i=>(i.fields.status?.name||'').toLowerCase().includes('queue'));
-    const qaStage  = allQueue.filter(i=>(i.fields.status?.name||'').toLowerCase()==='qa stage');
-    const qaProd   = allQueue.filter(i=>(i.fields.status?.name||'').toLowerCase()==='qa production');
+    // ── BULK QUERY 3: Queue (Backlog + QA Stage + QA Production, all members) ──
+    lbl.textContent='Query 3/4 — QA Queue, Stage & Production...';
+    fill.style.width='60%';
+    const jqlQ = `${assigneeIN} AND status IN ("QA QUEUE","QA STAGE","QA PRODUCTION") ORDER BY priority DESC, updated ASC`;
+    const r3 = await jiraReqSafe(`/rest/api/2/search?jql=${encodeURIComponent(jqlQ)}&maxResults=500&fields=${fields}`);
+    (r3?.issues||[]).forEach(i => {
+      const uname = i.fields.assignee?.name || i.fields.assignee?.key;
+      if (!uname || !teamData[uname]) return;
+      const s = (i.fields.status?.name||'').toLowerCase();
+      if (s.includes('queue'))           teamData[uname].backlog.push(i);
+      else if (s === 'qa stage')         teamData[uname].qaStage.push(i);
+      else if (s === 'qa production')    teamData[uname].qaProd.push(i);
+    });
 
-    // Filter closed by changelog date
+    // ── BULK QUERY 4: Closed Cases (all members, with changelog) ──
+    lbl.textContent='Query 4/4 — Closed Cases...';
+    fill.style.width='80%';
+    const jqlCL = `${assigneeIN} AND status = "Complete" ORDER BY updated DESC`;
+    const r4 = await jiraReqSafe(`/rest/api/2/search?jql=${encodeURIComponent(jqlCL)}&maxResults=500&fields=${fields}&expand=changelog`);
     const targetDateStr = date || getISTToday();
-    const allComplete = r2.status==='fulfilled' ? (r2.value.issues||[]) : [];
-    const closed = allComplete.filter(issue =>
-      (issue.changelog?.histories||[]).some(h => {
+    (r4?.issues||[]).forEach(issue => {
+      const uname = issue.fields.assignee?.name || issue.fields.assignee?.key;
+      if (!uname || !teamData[uname]) return;
+      // Check if status changed to Complete on target date
+      const closedOnDate = (issue.changelog?.histories||[]).some(h => {
         if (!h.created) return false;
         const histDateIST = new Date(h.created).toLocaleDateString('en-CA',{timeZone:'Asia/Kolkata'});
         if (histDateIST !== targetDateStr) return false;
         return (h.items||[]).some(item => item.field==='status' && (item.toString||'').toLowerCase()==='complete');
-      })
-    );
-
-    const allIssues=[...new Map([...closed,...customer,...sentBack,...allQueue].map(i=>[i.key,i])).values()];
-    const aging=qaStage.filter(i=>isAging(i.fields.updated));
-    const overdue=allIssues.filter(i=>isOverdue(i.fields.duedate));
-    const priorities={critical:0,high:0,medium:0,low:0};
-    [...qaStage,...qaProd].forEach(i=>{
-      const p=(i.fields.priority?.name||'').toLowerCase();
-      if(p==='critical'||p==='blocker') priorities.critical++;
-      else if(p==='high'||p==='major') priorities.high++;
-      else if(p==='medium'||p==='normal') priorities.medium++;
-      else priorities.low++;
+      });
+      if (closedOnDate) teamData[uname].closed.push(issue);
     });
 
-    return {member:m, sentBack, closed, customer, backlog, qaStage, qaProd, aging, overdue, priorities, allIssues};
-  }
-
-  // Process in batches of BATCH_SIZE
-  for(let i=0; i<teamMembers.length; i+=BATCH_SIZE) {
-    const batch = teamMembers.slice(i, i+BATCH_SIZE);
-    lbl.textContent=`Fetching members ${i+1}–${Math.min(i+BATCH_SIZE,teamMembers.length)} of ${teamMembers.length}...`;
-    fill.style.width=Math.round((i/teamMembers.length)*100)+'%';
-
-    const results = await Promise.allSettled(batch.map(m => fetchMember(m)));
-    results.forEach((r, idx) => {
-      const m = batch[idx];
-      if (r.status==='fulfilled') {
-        teamData[m.name] = r.value;
-      } else {
-        console.warn('Failed for', m.name, r.reason);
-        teamData[m.name] = {member:m, sentBack:[],closed:[],customer:[],backlog:[],qaStage:[],qaProd:[],aging:[],overdue:[],priorities:{critical:0,high:0,medium:0,low:0},allIssues:[]};
-      }
-      completed++;
+    // ── Post-process: aging, overdue, priorities ──
+    fill.style.width='95%';
+    lbl.textContent='Processing results...';
+    teamMembers.forEach(m => {
+      const d = teamData[m.name];
+      d.aging   = d.qaStage.filter(i=>isAging(i.fields.updated));
+      d.overdue  = [...d.closed,...d.customer,...d.sentBack,...d.backlog,...d.qaStage,...d.qaProd].filter(i=>isOverdue(i.fields.duedate));
+      d.allIssues = [...new Map([...d.closed,...d.customer,...d.sentBack,...d.backlog,...d.qaStage,...d.qaProd].map(i=>[i.key,i])).values()];
+      [...d.qaStage,...d.qaProd].forEach(i=>{
+        const p=(i.fields.priority?.name||'').toLowerCase();
+        if(p==='critical'||p==='blocker') d.priorities.critical++;
+        else if(p==='high'||p==='major') d.priorities.high++;
+        else if(p==='medium'||p==='normal') d.priorities.medium++;
+        else d.priorities.low++;
+      });
     });
-    fill.style.width=Math.round((completed/teamMembers.length)*100)+'%';
+
+  } catch(e) {
+    showSbar('fetch-status',`❌ Fetch error: ${e.message}`,'err');
+    document.getElementById('fetch-btn').disabled=false;
+    return;
   }
 
   fill.style.width='100%';
-  lbl.textContent=`Done — fetched all ${teamMembers.length} members`;
+  lbl.textContent=`Done — fetched all ${teamMembers.length} members in 4 queries`;
   showSbar('fetch-status',`✅ Fetched data for all ${teamMembers.length} members.`,'ok');
 
   renderTeamOverview();
@@ -860,11 +870,37 @@ async function fetchAll() {
   saveToHistory(date);
   document.getElementById('fetch-btn').disabled=false;
 
-  // Auto-generate AI if enabled
   if (geminiAuto && geminiKey) {
     showToast('🤖 Auto-generating AI insights...');
     setTimeout(() => generateAIForAll(), 800);
   }
+}
+
+// Build bulk JQL replacing currentUser() with assignee IN clause
+function buildJqlBulk(template, assigneeIN, date) {
+  // Replace "assignee = currentUser()" or similar with bulk assignee clause
+  let jql = template
+    .replace(/assignee\s*=\s*currentUser\(\)/gi, assigneeIN)
+    .replace(/BY\s+currentUser\(\)/gi, `BY currentUser()`) // keep BY as-is for status CHANGED
+    .replace(/currentUser\(\)/gi, assigneeIN);
+
+  const today = getISTToday();
+  const targetDate = date || today;
+  const startIST = `"${targetDate} 00:00"`;
+  const endIST   = `"${targetDate} 23:59"`;
+
+  jql = jql.replace(/ON\s+startOfDay\(\)/gi,    `ON "${targetDate}"`);
+  jql = jql.replace(/AFTER\s+startOfDay\(\)/gi, `AFTER ${startIST} BEFORE ${endIST}`);
+  jql = jql.replace(/>=\s*startOfDay\(\)/gi,    `>= ${startIST}`);
+  jql = jql.replace(/<=\s*endOfDay\(\)/gi,      `<= ${endIST}`);
+  jql = jql.replace(/startOfDay\(\)/gi,         startIST);
+  jql = jql.replace(/endOfDay\(\)/gi,           endIST);
+
+  return jql;
+}
+
+async function jiraReqSafe(path) {
+  try { return await jiraReq(path); } catch(e) { console.warn('Query failed:', path, e.message); return null; }
 }
 
 // ── Team Overview ──────────────────────────────────────────────────
